@@ -1173,17 +1173,17 @@
         allMsgElements.push({ el, key: snap.key, msg });
         knownReactions[snap.key] = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
 
-        addDoubleTap(el, () => openReactionPicker(snap.key));
-
         if (isMine && !msg.deleted) {
           myMessages.push({ el, timestamp: msg.timestamp });
           updateSeenIndicator();
+          addDoubleTap(el, () => showMsgActions(snap.key, msg.type, true));
           addLongPress(el, () => showMsgActions(snap.key, msg.type, true));
         } else if (!isMine) {
           if (!isFirstLoad[chatId]) {
             db.ref(`chats/${chatId}/seen/${user}`).set(firebase.database.ServerValue.TIMESTAMP);
           }
-          if (isSaud && !msg.deleted) {
+          if (!msg.deleted) {
+            addDoubleTap(el, () => showMsgActions(snap.key, msg.type, false));
             addLongPress(el, () => showMsgActions(snap.key, msg.type, false));
           }
         }
