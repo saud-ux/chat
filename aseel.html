@@ -652,6 +652,20 @@
       font-family: inherit; margin-top: 8px; text-align: center;
     }
 
+    /* ===== SCROLL TO BOTTOM BUTTON ===== */
+    .btn-scroll-bottom {
+      position: absolute; bottom: 80px; left: 16px;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--header-bg); border: 1px solid var(--border);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      cursor: pointer; display: none; align-items: center;
+      justify-content: center; z-index: 10;
+      font-size: 18px; color: var(--muted);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .btn-scroll-bottom.visible { display: flex; animation: fadeIn 0.2s; }
+    .btn-scroll-bottom:active { transform: scale(0.9); }
+
     /* ===== SEARCH ===== */
     .search-bar {
       background: var(--header-bg); padding: 8px 16px;
@@ -728,6 +742,7 @@
       <div class="app-wrap">
         <header id="chat-header" class="chat-header"></header>
         <div id="messages-area" class="messages-area"></div>
+        <button id="btn-scroll-bottom" class="btn-scroll-bottom" onclick="scrollToBottom(true)">↓</button>
         <div id="media-preview" class="media-preview-bar" style="display:none"></div>
         <div id="edit-indicator" class="edit-indicator" style="display:none">
           <span>✏️ تعديل الرسالة</span>
@@ -1120,6 +1135,13 @@
 
       const area = $('messages-area');
       area.innerHTML = '';
+
+      area.addEventListener('scroll', () => {
+        const btn = $('btn-scroll-bottom');
+        if (!btn) return;
+        const distFromBottom = area.scrollHeight - area.scrollTop - area.clientHeight;
+        btn.classList.toggle('visible', distFromBottom > 150);
+      });
 
       currentWallpaper = null;
       area.style.backgroundImage = '';
@@ -1692,6 +1714,9 @@
       let html = '';
       html += `<button class="msg-action-btn" onclick="setReply('${key}')">↩️ رد</button>`;
       html += `<button class="msg-action-btn" onclick="hideMsgActions();openReactionPicker('${key}')">😀 تفاعل</button>`;
+      if (msgType === 'text') {
+        html += `<button class="msg-action-btn" onclick="copyMessage('${key}')">📋 نسخ</button>`;
+      }
       if (canEdit && msgType === 'text') {
         html += `<button class="msg-action-btn" onclick="editMessage('${key}')">✏️ تعديل</button>`;
       }
@@ -1711,6 +1736,13 @@
         deleted: true,
         content: ''
       });
+    }
+
+    function copyMessage(key) {
+      hideMsgActions();
+      const entry = allMsgElements.find(m => m.key === key);
+      if (!entry || entry.msg.type !== 'text') return;
+      navigator.clipboard.writeText(entry.msg.content).catch(() => {});
     }
 
     function editMessage(key) {
