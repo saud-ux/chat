@@ -874,6 +874,7 @@
     let searchOpen = false;
     let allMsgElements = [];
     let knownReactions = {};
+    let currentWallpaper = null;
 
     /* ==========================================================
        DOM REFERENCES
@@ -886,11 +887,6 @@
       if (saved) document.documentElement.setAttribute('data-theme', saved);
     })();
 
-    // Wallpaper init
-    (function() {
-      const wp = localStorage.getItem('chat_wallpaper');
-      if (wp) document.documentElement.style.setProperty('--chat-bg', wp);
-    })();
 
     /* ==========================================================
        ROUTER
@@ -978,6 +974,7 @@
       searchOpen = false;
       allMsgElements = [];
       knownReactions = {};
+      currentWallpaper = null;
       const ei = $('edit-indicator');
       if (ei) ei.style.display = 'none';
       const sb = $('btn-send');
@@ -1124,14 +1121,24 @@
       const area = $('messages-area');
       area.innerHTML = '';
 
-      const wpImg = localStorage.getItem('chat_wallpaper_img_' + chatId);
-      if (wpImg) {
-        area.style.backgroundImage = `url(${wpImg})`;
-        area.classList.add('has-wallpaper-img');
-      } else {
-        area.style.backgroundImage = '';
-        area.classList.remove('has-wallpaper-img');
-      }
+      currentWallpaper = null;
+      area.style.backgroundImage = '';
+      area.classList.remove('has-wallpaper-img');
+      const wpRef = db.ref(`chats/${chatId}/wallpaper`);
+      addListener(wpRef, 'value', snap => {
+        const wpImg = snap.val();
+        currentWallpaper = wpImg;
+        const a = $('messages-area');
+        if (a) {
+          if (wpImg) {
+            a.style.backgroundImage = `url(${wpImg})`;
+            a.classList.add('has-wallpaper-img');
+          } else {
+            a.style.backgroundImage = '';
+            a.classList.remove('has-wallpaper-img');
+          }
+        }
+      });
 
       if (isSaud) {
         localStorage.setItem(`lastRead_saud_${chatId}`, Date.now().toString());
@@ -2149,7 +2156,7 @@
       if (old) { old.remove(); return; }
 
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-      const hasWpImg = !!localStorage.getItem('chat_wallpaper_img_' + currentChatId);
+      const hasWpImg = !!currentWallpaper;
 
       const overlay = document.createElement('div');
       overlay.id = 'settings-overlay';
@@ -2188,15 +2195,10 @@
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
           try {
-            localStorage.setItem('chat_wallpaper_img_' + currentChatId, dataUrl);
+            db.ref(`chats/${currentChatId}/wallpaper`).set(dataUrl);
           } catch(e) {
             alert('الصورة كبيرة جداً، اختر صورة أصغر');
             return;
-          }
-          const area = $('messages-area');
-          if (area) {
-            area.style.backgroundImage = `url(${dataUrl})`;
-            area.classList.add('has-wallpaper-img');
           }
           const settingsOverlay = document.getElementById('settings-overlay');
           if (settingsOverlay) settingsOverlay.remove();
@@ -2208,12 +2210,7 @@
     }
 
     function resetWallpaperImg() {
-      localStorage.removeItem('chat_wallpaper_img_' + currentChatId);
-      const area = $('messages-area');
-      if (area) {
-        area.style.backgroundImage = '';
-        area.classList.remove('has-wallpaper-img');
-      }
+      db.ref(`chats/${currentChatId}/wallpaper`).remove();
       const settingsOverlay = document.getElementById('settings-overlay');
       if (settingsOverlay) settingsOverlay.remove();
       openSettings();
