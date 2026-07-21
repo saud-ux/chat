@@ -1124,7 +1124,7 @@
       const area = $('messages-area');
       area.innerHTML = '';
 
-      const wpImg = localStorage.getItem('chat_wallpaper_img');
+      const wpImg = localStorage.getItem('chat_wallpaper_img_' + chatId);
       if (wpImg) {
         area.style.backgroundImage = `url(${wpImg})`;
         area.classList.add('has-wallpaper-img');
@@ -2131,7 +2131,7 @@
       if (old) { old.remove(); return; }
 
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-      const hasWpImg = !!localStorage.getItem('chat_wallpaper_img');
+      const hasWpImg = !!localStorage.getItem('chat_wallpaper_img_' + currentChatId);
 
       const overlay = document.createElement('div');
       overlay.id = 'settings-overlay';
@@ -2170,7 +2170,7 @@
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
           try {
-            localStorage.setItem('chat_wallpaper_img', dataUrl);
+            localStorage.setItem('chat_wallpaper_img_' + currentChatId, dataUrl);
           } catch(e) {
             alert('الصورة كبيرة جداً، اختر صورة أصغر');
             return;
@@ -2190,7 +2190,7 @@
     }
 
     function resetWallpaperImg() {
-      localStorage.removeItem('chat_wallpaper_img');
+      localStorage.removeItem('chat_wallpaper_img_' + currentChatId);
       const area = $('messages-area');
       if (area) {
         area.style.backgroundImage = '';
