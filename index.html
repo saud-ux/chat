@@ -873,6 +873,7 @@
     let replyToMsg = null;
     let searchOpen = false;
     let allMsgElements = [];
+    let knownReactions = {};
 
     /* ==========================================================
        DOM REFERENCES
@@ -976,6 +977,7 @@
       replyToMsg = null;
       searchOpen = false;
       allMsgElements = [];
+      knownReactions = {};
       const ei = $('edit-indicator');
       if (ei) ei.style.display = 'none';
       const sb = $('btn-send');
@@ -1162,6 +1164,7 @@
         renderMsgContent(el, msg, isMine);
         area.appendChild(el);
         allMsgElements.push({ el, key: snap.key, msg });
+        knownReactions[snap.key] = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
 
         addDoubleTap(el, () => openReactionPicker(snap.key));
 
@@ -1194,6 +1197,18 @@
         const el = document.querySelector(`[data-key="${snap.key}"]`);
         if (!el) return;
         const isMine = msg.sender === user;
+
+        if (isMine && !isFirstLoad[chatId] && msg.reactions) {
+          const oldReactions = knownReactions[snap.key] || {};
+          Object.entries(msg.reactions).forEach(([reactor, emoji]) => {
+            if (reactor !== user && oldReactions[reactor] !== emoji) {
+              const reactorName = reactor === 'saud' ? 'سعود' : (CONTACTS[reactor] ? CONTACTS[reactor].name : reactor);
+              notify(chatId, reactorName, `تفاعل على رسالتك ${emoji}`);
+            }
+          });
+        }
+        knownReactions[snap.key] = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
+
         renderMsgContent(el, msg, isMine);
         if (msg.deleted && isMine) {
           myMessages = myMessages.filter(m => m.el !== el);
@@ -2032,6 +2047,10 @@
           db.ref(`chats/${currentChatId}/messages/${key}/reactions/${currentUser}`).remove();
         } else {
           db.ref(`chats/${currentChatId}/messages/${key}/reactions/${currentUser}`).set(emoji);
+          const entry = allMsgElements.find(m => m.key === key);
+          if (entry && entry.msg.sender !== currentUser) {
+            sendPush(currentChatId, `تفاعل على رسالتك ${emoji}`);
+          }
         }
       });
     }
@@ -2043,6 +2062,10 @@
           db.ref(`chats/${currentChatId}/messages/${key}/reactions/${currentUser}`).remove();
         } else {
           db.ref(`chats/${currentChatId}/messages/${key}/reactions/${currentUser}`).set(emoji);
+          const entry = allMsgElements.find(m => m.key === key);
+          if (entry && entry.msg.sender !== currentUser) {
+            sendPush(currentChatId, `تفاعل على رسالتك ${emoji}`);
+          }
         }
       });
     }
