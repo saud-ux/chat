@@ -31,8 +31,8 @@ self.addEventListener('notificationclick', function(event) {
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       for (var i = 0; i < clientList.length; i++) {
         var client = clientList[i];
-        if (client.url.indexOf(self.location.origin) !== -1 && 'focus' in client) {
-          return client.focus();
+        if (client.url.indexOf(self.location.origin) !== -1 && 'navigate' in client) {
+          return client.navigate(targetUrl).then(function(c) { return c.focus(); });
         }
       }
       return clients.openWindow(targetUrl);

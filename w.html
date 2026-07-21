@@ -1216,6 +1216,22 @@
         }
       });
 
+      addListener(ref, 'child_removed', snap => {
+        const el = document.querySelector(`[data-key="${snap.key}"]`);
+        if (el) {
+          const prev = el.previousElementSibling;
+          const next = el.nextElementSibling;
+          if (prev && prev.classList.contains('date-separator') && (!next || next.classList.contains('date-separator'))) {
+            prev.remove();
+          }
+          el.remove();
+        }
+        myMessages = myMessages.filter(m => m.el !== el);
+        allMsgElements = allMsgElements.filter(m => m.key !== snap.key);
+        delete knownReactions[snap.key];
+        updateSeenIndicator();
+      });
+
       setTimeout(() => {
         isFirstLoad[chatId] = false;
         scrollToBottom(false);
@@ -1712,6 +1728,8 @@
       db.ref(`chats/${chatId}/messages`).remove();
       $('messages-area').innerHTML = '';
       myMessages = [];
+      allMsgElements = [];
+      knownReactions = {};
     }
 
     function cancelEdit() {
