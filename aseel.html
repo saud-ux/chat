@@ -1539,11 +1539,26 @@
     }
 
     function compressVideoToDataUrl(file, onProgress) {
+      if (typeof MediaRecorder === 'undefined') {
+        return fileToDataUrl(file);
+      }
+      var formats = ['video/mp4', 'video/mp4;codecs=avc1', 'video/webm;codecs=vp8', 'video/webm'];
+      var mimeType = '';
+      for (var i = 0; i < formats.length; i++) {
+        if (MediaRecorder.isTypeSupported(formats[i])) { mimeType = formats[i]; break; }
+      }
+      if (!mimeType) {
+        return fileToDataUrl(file);
+      }
       return new Promise((resolve, reject) => {
         const video = document.createElement('video');
         video.muted = true;
         video.playsInline = true;
         video.preload = 'auto';
+
+        var timeout = setTimeout(() => {
+          fileToDataUrl(file).then(resolve).catch(reject);
+        }, 120000);
 
         video.onloadedmetadata = () => {
           let w = video.videoWidth, h = video.videoHeight;
@@ -1569,29 +1584,22 @@
             dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
           } catch(e) {}
 
-          let mimeType = 'video/webm;codecs=vp8';
-          if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'video/webm';
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-              mimeType = 'video/mp4';
-              if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
-            }
-          }
-
           const recorder = new MediaRecorder(stream, {
-            mimeType: mimeType || undefined,
+            mimeType: mimeType,
             videoBitsPerSecond: 600000
           });
           const chunks = [];
           recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
           recorder.onstop = () => {
-            const blob = new Blob(chunks, { type: recorder.mimeType });
+            clearTimeout(timeout);
+            const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
             reader.onerror = reject;
             reader.readAsDataURL(blob);
           };
           recorder.onerror = () => {
+            clearTimeout(timeout);
             fileToDataUrl(file).then(resolve).catch(reject);
           };
 
@@ -1613,6 +1621,7 @@
         };
 
         video.onerror = () => {
+          clearTimeout(timeout);
           fileToDataUrl(file).then(resolve).catch(reject);
         };
         video.src = URL.createObjectURL(file);
