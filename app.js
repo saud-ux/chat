@@ -1394,6 +1394,9 @@
       if (canEdit && msgType === 'text') {
         html += `<button class="msg-action-btn" onclick="editMessage('${key}')">✏️ تعديل</button>`;
       }
+      if (msgType === 'gif' || msgType === 'image') {
+        html += `<button class="msg-action-btn" onclick="saveAsSticker('${key}')">⭐ حفظ كستيكر</button>`;
+      }
       html += `<button class="msg-action-btn danger" onclick="deleteMessage('${key}')">🗑️ حذف</button>`;
       html += `<button class="msg-action-btn msg-action-cancel" onclick="hideMsgActions()">إلغاء</button>`;
       $('msg-actions-content').innerHTML = html;
@@ -1417,6 +1420,36 @@
       const entry = allMsgElements.find(m => m.key === key);
       if (!entry || entry.msg.type !== 'text') return;
       navigator.clipboard.writeText(entry.msg.content).catch(() => {});
+    }
+
+    // Save a received (or sent) sticker/GIF straight into the shared pack,
+    // reusing its hosted URL — no download-then-reupload needed.
+    function saveAsSticker(key) {
+      hideMsgActions();
+      const entry = allMsgElements.find(m => m.key === key);
+      if (!entry || !db) return;
+      const msg = entry.msg;
+      if (!msg || !msg.content || (msg.type !== 'gif' && msg.type !== 'image')) return;
+      if (navigator.vibrate) navigator.vibrate(12);
+      db.ref('stickers').once('value', snap => {
+        let exists = false;
+        snap.forEach(ch => { const v = ch.val(); if (v && v.url === msg.content) exists = true; });
+        if (exists) { miniToast('موجود في ستيكراتك ✓'); return; }
+        db.ref('stickers').push({
+          url: msg.content,
+          type: msg.type,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => miniToast('تم الحفظ في ستيكراتك ⭐'))
+          .catch(() => miniToast('تعذّر الحفظ'));
+      });
+    }
+
+    function miniToast(text) {
+      const t = document.createElement('div');
+      t.className = 'mini-toast';
+      t.textContent = text;
+      document.body.appendChild(t);
+      setTimeout(() => { t.classList.add('hide'); setTimeout(() => t.remove(), 260); }, 1300);
     }
 
     function editMessage(key) {
