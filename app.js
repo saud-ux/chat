@@ -531,12 +531,33 @@
       const attachBtn = $('btn-attach');
       const fileInput = $('file-input');
 
+      // The message box is a contenteditable div (so iOS doesn't treat it as a
+      // form field and hide the keyboard navigation bar). Expose a .value shim
+      // so the rest of the code keeps working exactly like a textarea.
+      if (!input._valShim) {
+        Object.defineProperty(input, 'value', {
+          configurable: true,
+          get() { return (this.innerText || '').replace(/ /g, ' '); },
+          set(v) {
+            this.textContent = (v == null) ? '' : v;
+            this.classList.toggle('is-empty', !this.textContent);
+          }
+        });
+        input._valShim = true;
+      }
+
+      const autoGrow = () => {
+        if (!input.innerText.trim() && input.innerHTML !== '') input.innerHTML = '';
+        input.classList.toggle('is-empty', !input.innerText.trim());
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+      };
+
       input.value = '';
       input.style.height = 'auto';
 
       input.oninput = () => {
-        input.style.height = 'auto';
-        input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+        autoGrow();
         setTyping();
         updateInputButtons();
       };

@@ -309,14 +309,20 @@
     }
 
     .msg-input {
-      flex: 1; border: 1px solid var(--border); border-radius: 22px;
-      padding: 10px 16px; font-size: 15px; outline: none; resize: none;
+      flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 22px;
+      padding: 10px 16px; font-size: 15px; outline: none;
       font-family: inherit; max-height: 120px; min-height: 42px;
       line-height: 1.4; background: #f8f9fa;
       transition: border-color 0.2s;
+      overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+      -webkit-user-select: text; user-select: text;
     }
 
     .msg-input:focus { border-color: var(--accent); }
+    .msg-input.is-empty::before {
+      content: attr(data-placeholder);
+      color: var(--muted); pointer-events: none; cursor: text;
+    }
 
     .btn-send {
       background: var(--accent); border: none; cursor: pointer;
