@@ -404,7 +404,7 @@
         if (isMine && !msg.deleted) {
           myMessages.push({ el, timestamp: msg.timestamp });
           updateSeenIndicator();
-          addDoubleTap(el, () => showMsgActions(snap.key, msg.type, true));
+          addTapGestures(el, () => addReaction(snap.key, '❤️'), () => showMsgActions(snap.key, msg.type, true));
           addLongPress(el, () => showMsgActions(snap.key, msg.type, true));
           addSwipeReply(el, snap.key);
         } else if (!isMine) {
@@ -412,7 +412,7 @@
             db.ref(`chats/${chatId}/seen/${user}`).set(firebase.database.ServerValue.TIMESTAMP);
           }
           if (!msg.deleted) {
-            addDoubleTap(el, () => showMsgActions(snap.key, msg.type, false));
+            addTapGestures(el, () => addReaction(snap.key, '❤️'), () => showMsgActions(snap.key, msg.type, false));
             addLongPress(el, () => showMsgActions(snap.key, msg.type, false));
             addSwipeReply(el, snap.key);
           }
@@ -1633,19 +1633,33 @@
     ========================================================== */
     const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '👍', '🔥'];
 
-    function addDoubleTap(el, callback) {
-      let lastTap = 0;
+    // Double-tap = quick ❤️ reaction, triple-tap = actions menu.
+    // We wait a short window after the last tap to tell double from triple.
+    function addTapGestures(el, onDouble, onTriple) {
+      let taps = 0;
+      let timer = null;
+      let lastTouch = 0;
+
+      function register() {
+        taps++;
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          const count = taps;
+          taps = 0;
+          if (count === 2) onDouble();
+          else if (count >= 3) onTriple();
+        }, 320);
+      }
+
       el.addEventListener('touchend', (e) => {
-        const now = Date.now();
-        if (now - lastTap < 300) {
-          e.preventDefault();
-          callback();
-        }
-        lastTap = now;
+        lastTouch = Date.now();
+        if (taps >= 1) e.preventDefault(); // avoid double-tap zoom on repeats
+        register();
       });
-      el.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        callback();
+
+      el.addEventListener('click', () => {
+        if (Date.now() - lastTouch < 600) return; // ignore ghost click after a touch
+        register();
       });
     }
 
