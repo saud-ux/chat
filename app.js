@@ -341,7 +341,7 @@
       if (msg.type === 'gif') return '🎞️ GIF';
       if (msg.type === 'video') return '🎥 فيديو';
       if (msg.type === 'audio') return '🎤 رسالة صوتية';
-      if (msg.type === 'game') return msg.game === 'rps' ? '🎮 حجرة ورقة مقص' : '🎮 لعبة إكس أو';
+      if (msg.type === 'game') return msg.game === 'rps' ? '🎮 حجرة ورقة مقص' : msg.game === 'c4' ? '🎮 أربعة في خط' : msg.game === 'guess' ? '🎮 خمّن الرقم' : '🎮 لعبة إكس أو';
       return msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
     }
 
@@ -1505,7 +1505,10 @@
       } else if (msg.type === 'audio') {
         content = `<div class="msg-audio" data-audio="${escapeAttr(msg.content)}" data-dur="${msg.duration || 0}"><button class="audio-play" onclick="toggleAudioPlay(this)">▶</button><div class="audio-body"><div class="audio-wave" onclick="seekAudio(event, this)">${waveBarsHtml(msg.content, 34)}</div><span class="audio-dur">${formatDur(msg.duration || 0)}</span></div><button class="audio-speed" onclick="cycleAudioSpeed(this)">${audioSpeed}x</button></div>`;
       } else if (msg.type === 'game') {
-        content = msg.game === 'rps' ? renderRPS(msg, el.dataset.key) : renderXO(msg, el.dataset.key);
+        content = msg.game === 'rps' ? renderRPS(msg, el.dataset.key)
+          : msg.game === 'c4' ? renderC4(msg, el.dataset.key)
+          : msg.game === 'guess' ? renderGuess(msg, el.dataset.key)
+          : renderXO(msg, el.dataset.key);
       } else {
         const ec = emojiOnlyCount(msg.content);
         bigEmoji = ec > 0;
@@ -1656,6 +1659,8 @@
       let html = '';
       html += `<button class="msg-action-btn" onclick="hideMsgActions();startXO()">⭕ إكس أو (XO)</button>`;
       html += `<button class="msg-action-btn" onclick="hideMsgActions();startRPS()">✊✋✌️ حجرة ورقة مقص</button>`;
+      html += `<button class="msg-action-btn" onclick="hideMsgActions();startC4()">🔴 أربعة في خط</button>`;
+      html += `<button class="msg-action-btn" onclick="hideMsgActions();startGuess()">🔢 خمّن الرقم</button>`;
       html += `<button class="msg-action-btn msg-action-cancel" onclick="hideMsgActions()">إلغاء</button>`;
       $('msg-actions-content').innerHTML = html;
       $('msg-actions-overlay').style.display = 'flex';
@@ -1744,6 +1749,142 @@
         status = `اخترت ${emo[myChoice]} — بانتظار الطرف الثاني…`;
       }
       return `<div class="rps-game${done ? ' xo-done' : ''}"><div class="xo-title">✊✋✌️ حجرة ورقة مقص</div>${body}<div class="xo-status">${escapeHtml(status)}</div></div>`;
+    }
+
+    /* ---- Connect Four (أربعة في خط): 7 cols × 6 rows ---- */
+    function startC4() {
+      if (!currentChatId || !currentUser || !db) return;
+      db.ref(`chats/${currentChatId}/messages`).push({
+        sender: currentUser, type: 'game', game: 'c4',
+        board: '_'.repeat(42), turn: 'X',
+        px: currentUser, po: gameOther(), winner: '',
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+      sendPush(currentChatId, '🎮 بدأ لعبة أربعة في خط');
+    }
+
+    function c4WinnerOf(b) {
+      const R = 6, C = 7;
+      const at = (r, c) => (r >= 0 && r < R && c >= 0 && c < C) ? b[r * C + c] : '_';
+      const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+      for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+        const p = at(r, c);
+        if (p === '_') continue;
+        for (const [dr, dc] of dirs) {
+          if (at(r + dr, c + dc) === p && at(r + 2 * dr, c + 2 * dc) === p && at(r + 3 * dr, c + 3 * dc) === p) return p;
+        }
+      }
+      return b.indexOf('_') === -1 ? 'draw' : '';
+    }
+
+    function c4Drop(key, col) {
+      if (!currentChatId || !db) return;
+      const ref = db.ref(`chats/${currentChatId}/messages/${key}`);
+      ref.once('value', snap => {
+        const g = snap.val();
+        if (!g || g.type !== 'game' || g.game !== 'c4' || g.winner) return;
+        const myMark = g.px === currentUser ? 'X' : (g.po === currentUser ? 'O' : null);
+        if (!myMark || myMark !== g.turn) return;
+        const board = (g.board || '_'.repeat(42)).split('');
+        let placed = -1;
+        for (let r = 5; r >= 0; r--) { if (board[r * 7 + col] === '_') { board[r * 7 + col] = myMark; placed = r; break; } }
+        if (placed === -1) return; // column full
+        const nb = board.join('');
+        const w = c4WinnerOf(nb);
+        ref.update({ board: nb, turn: g.turn === 'X' ? 'O' : 'X', winner: w });
+        if (navigator.vibrate) navigator.vibrate(10);
+        if (w) sendPush(currentChatId, w === 'draw' ? '🎮 تعادل (أربعة في خط)' : '🎮 انتهت لعبة أربعة في خط');
+      });
+    }
+
+    function renderC4(msg, key) {
+      const b = (msg.board || '_'.repeat(42)).split('');
+      const meMark = msg.px === currentUser ? 'X' : (msg.po === currentUser ? 'O' : '');
+      let status;
+      if (msg.winner === 'draw') status = 'تعادل 🤝';
+      else if (msg.winner) status = meMark ? (msg.winner === meMark ? 'فزت! 🎉' : 'خسرت 😅') : `فاز ${msg.winner}`;
+      else { const tu = msg.turn === 'X' ? msg.px : msg.po; status = tu === currentUser ? 'دورك ✋' : 'دور الطرف الثاني…'; }
+      const k = escapeAttr(key);
+      const myTurn = !msg.winner && ((msg.turn === 'X' ? msg.px : msg.po) === currentUser);
+      let drops = '<div class="c4-drops">';
+      for (let c = 0; c < 7; c++) drops += `<button class="c4-drop" ${myTurn ? '' : 'disabled'} onclick="c4Drop('${k}',${c})">⬇</button>`;
+      drops += '</div>';
+      let cells = '<div class="c4-board">';
+      for (let i = 0; i < 42; i++) { const v = b[i]; cells += `<span class="c4-cell ${v === 'X' ? 'c4-x' : v === 'O' ? 'c4-o' : ''}"></span>`; }
+      cells += '</div>';
+      return `<div class="c4-game${msg.winner ? ' xo-done' : ''}"><div class="xo-title">🔴🟡 أربعة في خط</div>${drops}${cells}<div class="xo-status">${escapeHtml(status)}</div></div>`;
+    }
+
+    /* ---- Guess the number (خمّن الرقم): setter picks 1–100, guesser guesses ---- */
+    function startGuess() {
+      if (!currentChatId || !currentUser || !db) return;
+      db.ref(`chats/${currentChatId}/messages`).push({
+        sender: currentUser, type: 'game', game: 'guess',
+        px: currentUser, po: gameOther(),
+        secret: 0, guesses: '', winner: '',
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+      sendPush(currentChatId, '🎮 بدأ لعبة خمّن الرقم');
+    }
+
+    function setSecret(key, val) {
+      const n = parseInt(val, 10);
+      if (!(n >= 1 && n <= 100)) { miniToast('اكتب رقم من 1 إلى 100'); return; }
+      const ref = db.ref(`chats/${currentChatId}/messages/${key}`);
+      ref.once('value', snap => {
+        const g = snap.val();
+        if (!g || g.game !== 'guess' || g.px !== currentUser || g.secret) return;
+        ref.update({ secret: n });
+        sendPush(currentChatId, '🔢 اختار الرقم — خمّن!');
+      });
+    }
+
+    function guessNum(key, val) {
+      const n = parseInt(val, 10);
+      if (!(n >= 1 && n <= 100)) { miniToast('اكتب رقم من 1 إلى 100'); return; }
+      const ref = db.ref(`chats/${currentChatId}/messages/${key}`);
+      ref.once('value', snap => {
+        const g = snap.val();
+        if (!g || g.game !== 'guess' || g.po !== currentUser || !g.secret || g.winner) return;
+        const dir = n === g.secret ? 'c' : (n < g.secret ? 'u' : 'd');
+        const guesses = (g.guesses ? g.guesses + ',' : '') + n + '|' + dir;
+        const update = { guesses };
+        if (dir === 'c') update.winner = 'done';
+        ref.update(update);
+        if (navigator.vibrate) navigator.vibrate(dir === 'c' ? 20 : 8);
+        if (dir === 'c') sendPush(currentChatId, '🎮 خمّن الرقم صح! 🎉');
+      });
+    }
+
+    function renderGuess(msg, key) {
+      const meMark = msg.px === currentUser ? 'X' : (msg.po === currentUser ? 'O' : '');
+      const isSetter = meMark === 'X', isGuesser = meMark === 'O';
+      const secretSet = msg.secret && msg.secret > 0;
+      const done = msg.winner === 'done';
+      const guesses = (msg.guesses || '').split(',').filter(Boolean);
+      const k = escapeAttr(key);
+      let hist = '';
+      if (guesses.length) {
+        hist = '<div class="guess-hist">' + guesses.map(gg => {
+          const parts = gg.split('|'); const icon = parts[1] === 'u' ? '⬆️' : parts[1] === 'd' ? '⬇️' : '✅';
+          return `<span class="guess-chip">${escapeHtml(parts[0])} ${icon}</span>`;
+        }).join('') + '</div>';
+      }
+      let status, body = '';
+      if (done) {
+        status = `تم! خمّنها في ${guesses.length} محاولة 🎉`; body = hist;
+      } else if (!secretSet) {
+        if (isSetter) {
+          status = 'اختر رقم سري (1-100):';
+          body = `<div class="guess-input"><input type="number" min="1" max="100" inputmode="numeric" class="guess-field" id="gs-${k}"><button class="guess-btn" onclick="setSecret('${k}',document.getElementById('gs-${k}').value)">تعيين</button></div>`;
+        } else { status = 'بانتظار الطرف الثاني يختار الرقم…'; }
+      } else {
+        if (isGuesser) {
+          status = 'خمّن الرقم (1-100):';
+          body = hist + `<div class="guess-input"><input type="number" min="1" max="100" inputmode="numeric" class="guess-field" id="gg-${k}"><button class="guess-btn" onclick="guessNum('${k}',document.getElementById('gg-${k}').value)">خمّن</button></div>`;
+        } else { status = 'بانتظار تخمين الطرف الثاني…'; body = hist; }
+      }
+      return `<div class="guess-game${done ? ' xo-done' : ''}"><div class="xo-title">🔢 خمّن الرقم</div><div class="xo-status">${escapeHtml(status)}</div>${body}</div>`;
     }
 
     function xoWinnerOf(b) {
