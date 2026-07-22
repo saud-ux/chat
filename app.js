@@ -1905,33 +1905,43 @@
         input.type = 'file';
         input.id = 'sticker-file-input';
         input.accept = 'image/*';
+        input.multiple = true;
         input.style.display = 'none';
         document.body.appendChild(input);
       }
       input.value = '';
       input.onchange = (e) => {
-        const file = e.target.files[0];
-        if (file) uploadSticker(file);
+        const files = Array.from(e.target.files || []);
+        if (files.length) uploadStickers(files);
       };
       input.click();
     }
 
-    async function uploadSticker(file) {
+    async function uploadStickers(files) {
       const grid = document.getElementById('gif-grid');
-      const isGif = file.type === 'image/gif';
-      if (grid) grid.insertAdjacentHTML('afterbegin', '<div class="gif-status" id="sticker-uploading">جاري رفع الستيكر…</div>');
-      try {
-        const url = await uploadToCloudinary(file);
-        await db.ref('stickers').push({
-          url,
-          type: isGif ? 'gif' : 'image',
-          timestamp: firebase.database.ServerValue.TIMESTAMP
-        });
-        if (gifTab === 'stickers') loadStickers();
-      } catch (err) {
-        const up = document.getElementById('sticker-uploading');
-        if (up) up.textContent = 'تعذّر رفع الستيكر، حاول مرة أخرى';
+      let done = 0, failed = 0;
+      const setStatus = (txt) => {
+        let el = document.getElementById('sticker-uploading');
+        if (!el && grid) { grid.insertAdjacentHTML('afterbegin', `<div class="gif-status" id="sticker-uploading">${txt}</div>`); }
+        else if (el) el.textContent = txt;
+      };
+      setStatus(`جاري رفع الستيكرات… (0/${files.length})`);
+      for (const file of files) {
+        try {
+          const url = await uploadToCloudinary(file);
+          await db.ref('stickers').push({
+            url,
+            type: file.type === 'image/gif' ? 'gif' : 'image',
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+          });
+          done++;
+        } catch (err) {
+          failed++;
+        }
+        setStatus(`جاري رفع الستيكرات… (${done + failed}/${files.length})`);
       }
+      if (gifTab === 'stickers') loadStickers();
+      if (failed) setTimeout(() => setStatus(`تم رفع ${done}، وفشل ${failed}`), 50);
     }
 
     function deleteSticker(key) {
