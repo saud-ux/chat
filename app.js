@@ -171,23 +171,35 @@
       route();
     }
 
-    // Leave the chat with a smooth slide-out. The real navigation happens
-    // instantly beneath a static clone of the chat that animates away, so
-    // state stays correct while the exit still looks smooth.
+    // Leave the chat with a smooth slide-out: the real chat page slides off
+    // to the left on top while the home page is revealed beneath it. State is
+    // torn down first (same order as route: cleanup, then render home).
     function exitChatSmoothly(path) {
       path = path || '/';
       const chat = $('page-chat');
-      if (!chat || !chat.classList.contains('active') || currentUser !== 'saud') { navigate(path); return; }
-      const ghost = chat.cloneNode(true);
-      ghost.id = 'page-chat-ghost';
-      ghost.classList.remove('page', 'active');
-      ghost.classList.add('page-ghost');
-      document.body.appendChild(ghost);
-      navigate(path); // real navigation (cleanup + home) under the ghost
-      requestAnimationFrame(() => ghost.classList.add('page-exit'));
-      const kill = () => { if (ghost.parentNode) ghost.remove(); };
-      ghost.addEventListener('animationend', kill, { once: true });
-      setTimeout(kill, 600);
+      const home = $('page-home');
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!chat || !home || !chat.classList.contains('active') || currentUser !== 'saud' || reduce) {
+        navigate(path);
+        return;
+      }
+      // Real navigation state, minus the visual swap of the chat page.
+      history.pushState(null, '', path);
+      cleanup();
+      currentView = 'home';
+      home.classList.add('active');
+      showHome();
+      // Slide the (still-visible) chat page off to the left over the home page.
+      chat.classList.add('page-exiting');
+      chat.style.zIndex = '50';
+      requestAnimationFrame(() => chat.classList.add('page-exit-go'));
+      const done = () => {
+        chat.removeEventListener('transitionend', done);
+        chat.classList.remove('active', 'page-exiting', 'page-exit-go');
+        chat.style.zIndex = '';
+      };
+      chat.addEventListener('transitionend', done, { once: true });
+      setTimeout(done, 420);
     }
 
     /* ==========================================================
