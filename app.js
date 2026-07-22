@@ -1821,7 +1821,7 @@
       db.ref(`chats/${currentChatId}/messages`).push({
         sender: currentUser, type: 'game', game: 'guess',
         px: currentUser, po: gameOther(),
-        secret: 0, guesses: '', winner: '',
+        setter: '', secret: 0, guesses: '', winner: '',
         timestamp: firebase.database.ServerValue.TIMESTAMP
       });
       sendPush(currentChatId, '🎮 بدأ لعبة خمّن الرقم');
@@ -1833,8 +1833,10 @@
       const ref = db.ref(`chats/${currentChatId}/messages/${key}`);
       ref.once('value', snap => {
         const g = snap.val();
-        if (!g || g.game !== 'guess' || g.px !== currentUser || g.secret) return;
-        ref.update({ secret: n });
+        // Either participant may set the number — first to submit becomes the setter.
+        if (!g || g.game !== 'guess' || g.secret) return;
+        if (currentUser !== g.px && currentUser !== g.po) return;
+        ref.update({ secret: n, setter: currentUser });
         sendPush(currentChatId, '🔢 اختار الرقم — خمّن!');
       });
     }
@@ -1845,7 +1847,9 @@
       const ref = db.ref(`chats/${currentChatId}/messages/${key}`);
       ref.once('value', snap => {
         const g = snap.val();
-        if (!g || g.game !== 'guess' || g.po !== currentUser || !g.secret || g.winner) return;
+        if (!g || g.game !== 'guess' || !g.secret || g.winner) return;
+        if (currentUser === g.setter) return; // the setter can't guess
+        if (currentUser !== g.px && currentUser !== g.po) return;
         const dir = n === g.secret ? 'c' : (n < g.secret ? 'u' : 'd');
         const guesses = (g.guesses ? g.guesses + ',' : '') + n + '|' + dir;
         const update = { guesses };
@@ -1857,9 +1861,9 @@
     }
 
     function renderGuess(msg, key) {
-      const meMark = msg.px === currentUser ? 'X' : (msg.po === currentUser ? 'O' : '');
-      const isSetter = meMark === 'X', isGuesser = meMark === 'O';
+      const isParticipant = (msg.px === currentUser || msg.po === currentUser);
       const secretSet = msg.secret && msg.secret > 0;
+      const meIsSetter = msg.setter && msg.setter === currentUser;
       const done = msg.winner === 'done';
       const guesses = (msg.guesses || '').split(',').filter(Boolean);
       const k = escapeAttr(key);
@@ -1874,16 +1878,17 @@
       if (done) {
         status = `تم! خمّنها في ${guesses.length} محاولة 🎉`; body = hist;
       } else if (!secretSet) {
-        if (isSetter) {
-          status = 'اختر رقم سري (1-100):';
+        // Before a number is picked, either player may set it.
+        if (isParticipant) {
+          status = 'اختر رقم سري (1-100) والثاني يخمّن:';
           body = `<div class="guess-input"><input type="number" min="1" max="100" inputmode="numeric" class="guess-field" id="gs-${k}"><button class="guess-btn" onclick="setSecret('${k}',document.getElementById('gs-${k}').value)">تعيين</button></div>`;
-        } else { status = 'بانتظار الطرف الثاني يختار الرقم…'; }
-      } else {
-        if (isGuesser) {
-          status = 'خمّن الرقم (1-100):';
-          body = hist + `<div class="guess-input"><input type="number" min="1" max="100" inputmode="numeric" class="guess-field" id="gg-${k}"><button class="guess-btn" onclick="guessNum('${k}',document.getElementById('gg-${k}').value)">خمّن</button></div>`;
-        } else { status = 'بانتظار تخمين الطرف الثاني…'; body = hist; }
-      }
+        } else { status = 'لعبة جارية…'; }
+      } else if (meIsSetter) {
+        status = 'بانتظار تخمين الطرف الثاني…'; body = hist;
+      } else if (isParticipant) {
+        status = 'خمّن الرقم (1-100):';
+        body = hist + `<div class="guess-input"><input type="number" min="1" max="100" inputmode="numeric" class="guess-field" id="gg-${k}"><button class="guess-btn" onclick="guessNum('${k}',document.getElementById('gg-${k}').value)">خمّن</button></div>`;
+      } else { status = 'لعبة جارية…'; body = hist; }
       return `<div class="guess-game${done ? ' xo-done' : ''}"><div class="xo-title">🔢 خمّن الرقم</div><div class="xo-status">${escapeHtml(status)}</div>${body}</div>`;
     }
 
