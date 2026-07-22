@@ -531,20 +531,7 @@
       const attachBtn = $('btn-attach');
       const fileInput = $('file-input');
 
-      // The message box is a contenteditable div (so iOS doesn't treat it as a
-      // form field and hide the keyboard navigation bar). Expose a .value shim
-      // so the rest of the code keeps working exactly like a textarea.
-      if (!input._valShim) {
-        Object.defineProperty(input, 'value', {
-          configurable: true,
-          get() { return (this.innerText || '').replace(/ /g, ' '); },
-          set(v) {
-            this.textContent = (v == null) ? '' : v;
-            this.classList.toggle('is-empty', !this.textContent);
-          }
-        });
-        input._valShim = true;
-      }
+      ensureMsgInputShim();
 
       const autoGrow = () => {
         if (!input.innerText.trim() && input.innerHTML !== '') input.innerHTML = '';
@@ -586,7 +573,28 @@
       updateInputButtons();
     }
 
+    // The message box is a contenteditable div (so iOS doesn't treat it as a
+    // form field and show the keyboard navigation bar). This exposes a .value
+    // getter/setter so the rest of the code keeps working like a textarea.
+    // Must be applied before anything reads input.value — route()/cleanup()
+    // touch it at startup, before setupInput() ever runs.
+    function ensureMsgInputShim() {
+      const input = $('msg-input');
+      if (!input || input._valShim) return;
+      Object.defineProperty(input, 'value', {
+        configurable: true,
+        get() { return (this.innerText || '').split(String.fromCharCode(160)).join(' '); },
+        set(v) {
+          this.textContent = (v == null) ? '' : v;
+          this.classList.toggle('is-empty', !this.textContent);
+        }
+      });
+      input._valShim = true;
+      input.classList.toggle('is-empty', !input.textContent);
+    }
+
     function updateInputButtons() {
+      ensureMsgInputShim();
       const input = $('msg-input');
       const sendBtn = $('btn-send');
       const micBtn = $('btn-mic');
@@ -1897,5 +1905,6 @@
       });
     }
 
+    ensureMsgInputShim();
     route();
     window.addEventListener('popstate', route);
