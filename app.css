@@ -221,6 +221,28 @@
     }
 
     .msg-text { font-size: 15px; line-height: 1.45; white-space: pre-wrap; }
+    /* Rich text formatting */
+    .msg-text strong { font-weight: 800; }
+    .msg-text em { font-style: italic; }
+    .msg-text del { text-decoration: line-through; opacity: 0.85; }
+    .msg-text code {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.9em; background: rgba(0,0,0,0.14);
+      padding: 1px 5px; border-radius: 5px; direction: ltr; unicode-bidi: embed;
+    }
+    .message-mine .msg-text code { background: rgba(255,255,255,0.22); }
+    .msg-link { color: inherit; text-decoration: underline; word-break: break-all; }
+    .message-theirs .msg-link { color: var(--accent); }
+    /* Emoji-only messages render large and bubble-less (iMessage/Instagram) */
+    .msg-text.emoji-only { line-height: 1.1; }
+    .msg-text.emoji-1 { font-size: 52px; }
+    .msg-text.emoji-2 { font-size: 42px; }
+    .msg-text.emoji-3 { font-size: 34px; }
+    .message.big-emoji {
+      background: transparent; box-shadow: none; padding: 2px 6px 2px;
+    }
+    .message.big-emoji::after { display: none; }
+    .message-mine.big-emoji .msg-time { color: var(--muted); }
 
     .msg-image {
       max-width: 100%; border-radius: 6px; cursor: pointer;

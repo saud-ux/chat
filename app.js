@@ -1353,6 +1353,7 @@
         replyHtml = `<div class="msg-reply-quote" onclick="scrollToMessage('${escapeAttr(msg.replyTo.key)}')"><div class="msg-reply-name">${rName}</div><span class="msg-reply-text">${rText}</span></div>`;
       }
       let content = '';
+      let bigEmoji = false;
       if (msg.type === 'image') {
         content = `<img class="msg-image" src="${escapeAttr(msg.content)}" alt="صورة" loading="lazy" onclick="openViewer('${escapeAttr(msg.content)}')">`;
       } else if (msg.type === 'gif') {
@@ -1362,8 +1363,11 @@
       } else if (msg.type === 'audio') {
         content = `<div class="msg-audio" data-audio="${escapeAttr(msg.content)}" data-dur="${msg.duration || 0}"><button class="audio-play" onclick="toggleAudioPlay(this)">▶</button><div class="audio-body"><div class="audio-wave" onclick="seekAudio(event, this)">${waveBarsHtml(msg.content, 34)}</div><span class="audio-dur">${formatDur(msg.duration || 0)}</span></div><button class="audio-speed" onclick="cycleAudioSpeed(this)">${audioSpeed}x</button></div>`;
       } else {
-        content = `<div class="msg-text">${escapeHtml(msg.content)}</div>`;
+        const ec = emojiOnlyCount(msg.content);
+        bigEmoji = ec > 0;
+        content = `<div class="msg-text${ec ? ' emoji-only emoji-' + ec : ''}">${formatText(msg.content)}</div>`;
       }
+      el.classList.toggle('big-emoji', bigEmoji);
       let reactionsHtml = '';
       if (msg.reactions) {
         const counts = {};
@@ -1566,6 +1570,45 @@
 
     function escapeAttr(text) {
       return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    const URL_RE = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi;
+
+    // Rich text for messages: WhatsApp-style *bold* _italic_ ~strike~ `mono`,
+    // plus clickable links (Twitter/WhatsApp). Everything is escaped first.
+    function formatText(raw) {
+      const links = [];
+      // Pull links out (as @@Ln@@ tokens) so formatting markers inside a URL
+      // are left alone; the tokens carry no markdown chars and survive escaping.
+      let text = raw.replace(URL_RE, (m) => { links.push(m); return '@@L' + (links.length - 1) + '@@'; });
+      text = escapeHtml(text);
+      text = text
+        .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+        .replace(/\*(\S(?:[^*\n]*?\S)?)\*/g, '<strong>$1</strong>')
+        .replace(/~(\S(?:[^~\n]*?\S)?)~/g, '<del>$1</del>')
+        .replace(/_(\S(?:[^_\n]*?\S)?)_/g, '<em>$1</em>');
+      text = text.replace(/@@L(\d+)@@/g, (m, i) => {
+        const url = links[+i];
+        const href = /^https?:\/\//i.test(url) ? url : 'https://' + url;
+        return `<a class="msg-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+      });
+      return text;
+    }
+
+    // Returns the emoji count (1..3) for an emoji-only message, else 0 — used
+    // to render tiny emoji-only messages large (Instagram/iMessage style).
+    function emojiOnlyCount(raw) {
+      const t = (raw || '').trim();
+      if (!t) return 0;
+      if (/[0-9A-Za-z؀-ۿ]/.test(t)) return 0; // has letters/digits
+      let pictographic;
+      try { pictographic = /\p{Extended_Pictographic}/u.test(t); } catch (e) { return 0; }
+      if (!pictographic) return 0;
+      const noSpace = t.replace(/\s+/g, '');
+      let count;
+      try { count = [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(noSpace)].length; }
+      catch (e) { count = Array.from(noSpace).length; }
+      return count <= 3 ? count : 0;
     }
 
     function formatTime(ts) {
