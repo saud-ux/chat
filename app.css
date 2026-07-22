@@ -1076,3 +1076,21 @@
     .message-mine .xo-status { background: rgba(255,255,255,0.22); }
     .xo-done .xo-board { opacity: 0.65; }
     :root[data-theme="dark"] .message-theirs .xo-cell { background: rgba(255,255,255,0.1); }
+
+    /* Rock–Paper–Scissors */
+    .rps-game { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 2px 0; min-width: 190px; }
+    .rps-choices { display: flex; gap: 8px; }
+    .rps-btn {
+      width: 52px; height: 52px; border-radius: 14px; border: none; cursor: pointer;
+      font-size: 26px; background: rgba(255,255,255,0.28); color: inherit;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.08s, background 0.2s;
+    }
+    .message-theirs .rps-btn { background: rgba(0,0,0,0.07); }
+    .rps-btn:active { transform: scale(0.88); }
+    .rps-reveal { display: flex; align-items: center; gap: 14px; }
+    .rps-side { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .rps-emo { font-size: 34px; line-height: 1; }
+    .rps-lbl { font-size: 11px; opacity: 0.8; }
+    .rps-vs { font-size: 16px; font-weight: 800; opacity: 0.6; }
+    :root[data-theme="dark"] .message-theirs .rps-btn { background: rgba(255,255,255,0.1); }

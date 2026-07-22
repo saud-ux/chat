@@ -328,7 +328,7 @@
       if (msg.type === 'gif') return '🎞️ GIF';
       if (msg.type === 'video') return '🎥 فيديو';
       if (msg.type === 'audio') return '🎤 رسالة صوتية';
-      if (msg.type === 'game') return '🎮 لعبة إكس أو';
+      if (msg.type === 'game') return msg.game === 'rps' ? '🎮 حجرة ورقة مقص' : '🎮 لعبة إكس أو';
       return msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
     }
 
@@ -356,7 +356,7 @@
         </div>
         <span class="chat-header-name">${partnerName}</span>
         <div style="display:flex;gap:2px;margin-right:auto;align-items:center">
-          <button class="btn-theme" onclick="startXO()" aria-label="لعبة إكس أو">🎮</button>
+          <button class="btn-theme" onclick="openGamePicker()" aria-label="لعبة">🎮</button>
           <button class="btn-theme" onclick="toggleSearch()" aria-label="بحث">🔍</button>
           <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" aria-label="الوضع">${themeIcon}</button>
           <button class="btn-theme" onclick="openSettings()" aria-label="إعدادات">⚙️</button>
@@ -1411,7 +1411,7 @@
       let replyHtml = '';
       if (msg.replyTo) {
         const rName = msg.replyTo.sender === currentUser ? 'أنت' : (msg.replyTo.sender === 'saud' ? 'سعود' : (CONTACTS[msg.replyTo.sender] ? CONTACTS[msg.replyTo.sender].name : msg.replyTo.sender));
-        const rText = msg.replyTo.type === 'image' ? '📷 صورة' : msg.replyTo.type === 'gif' ? '🎞️ GIF' : msg.replyTo.type === 'video' ? '🎥 فيديو' : msg.replyTo.type === 'audio' ? '🎤 رسالة صوتية' : msg.replyTo.type === 'game' ? '🎮 لعبة إكس أو' : escapeHtml(msg.replyTo.text || '');
+        const rText = msg.replyTo.type === 'image' ? '📷 صورة' : msg.replyTo.type === 'gif' ? '🎞️ GIF' : msg.replyTo.type === 'video' ? '🎥 فيديو' : msg.replyTo.type === 'audio' ? '🎤 رسالة صوتية' : msg.replyTo.type === 'game' ? '🎮 لعبة' : escapeHtml(msg.replyTo.text || '');
         replyHtml = `<div class="msg-reply-quote" onclick="scrollToMessage('${escapeAttr(msg.replyTo.key)}')"><div class="msg-reply-name">${rName}</div><span class="msg-reply-text">${rText}</span></div>`;
       }
       let content = '';
@@ -1425,7 +1425,7 @@
       } else if (msg.type === 'audio') {
         content = `<div class="msg-audio" data-audio="${escapeAttr(msg.content)}" data-dur="${msg.duration || 0}"><button class="audio-play" onclick="toggleAudioPlay(this)">▶</button><div class="audio-body"><div class="audio-wave" onclick="seekAudio(event, this)">${waveBarsHtml(msg.content, 34)}</div><span class="audio-dur">${formatDur(msg.duration || 0)}</span></div><button class="audio-speed" onclick="cycleAudioSpeed(this)">${audioSpeed}x</button></div>`;
       } else if (msg.type === 'game') {
-        content = renderXO(msg, el.dataset.key);
+        content = msg.game === 'rps' ? renderRPS(msg, el.dataset.key) : renderXO(msg, el.dataset.key);
       } else {
         const ec = emojiOnlyCount(msg.content);
         bigEmoji = ec > 0;
@@ -1572,9 +1572,21 @@
        IN-CHAT GAME: TIC-TAC-TOE (إكس أو)
        Stored as a 'game' message so both players share live state.
     ========================================================== */
+    function openGamePicker() {
+      let html = '';
+      html += `<button class="msg-action-btn" onclick="hideMsgActions();startXO()">⭕ إكس أو (XO)</button>`;
+      html += `<button class="msg-action-btn" onclick="hideMsgActions();startRPS()">✊✋✌️ حجرة ورقة مقص</button>`;
+      html += `<button class="msg-action-btn msg-action-cancel" onclick="hideMsgActions()">إلغاء</button>`;
+      $('msg-actions-content').innerHTML = html;
+      $('msg-actions-overlay').style.display = 'flex';
+    }
+
+    function gameOther() {
+      return currentUser === 'saud' ? currentChatId : 'saud';
+    }
+
     function startXO() {
       if (!currentChatId || !currentUser || !db) return;
-      const other = currentUser === 'saud' ? currentChatId : 'saud';
       db.ref(`chats/${currentChatId}/messages`).push({
         sender: currentUser,
         type: 'game',
@@ -1582,11 +1594,76 @@
         board: '_________',
         turn: 'X',
         px: currentUser,   // starter is X
-        po: other,
+        po: gameOther(),
         winner: '',
         timestamp: firebase.database.ServerValue.TIMESTAMP
       });
       sendPush(currentChatId, '🎮 بدأ لعبة إكس أو');
+    }
+
+    /* ---- Rock–Paper–Scissors (حجرة ورقة مقص) ---- */
+    function startRPS() {
+      if (!currentChatId || !currentUser || !db) return;
+      db.ref(`chats/${currentChatId}/messages`).push({
+        sender: currentUser,
+        type: 'game',
+        game: 'rps',
+        px: currentUser,
+        po: gameOther(),
+        cx: '',   // X's choice (r/p/s), hidden until both pick
+        co: '',   // O's choice
+        winner: '',
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+      sendPush(currentChatId, '🎮 بدأ لعبة حجرة ورقة مقص');
+    }
+
+    function rpsBeats(a, b) {
+      return (a === 'r' && b === 's') || (a === 's' && b === 'p') || (a === 'p' && b === 'r');
+    }
+
+    function rpsPick(key, choice) {
+      if (!currentChatId || !db) return;
+      const ref = db.ref(`chats/${currentChatId}/messages/${key}`);
+      ref.once('value', snap => {
+        const g = snap.val();
+        if (!g || g.type !== 'game' || g.game !== 'rps' || g.winner) return;
+        const meMark = g.px === currentUser ? 'X' : (g.po === currentUser ? 'O' : null);
+        if (!meMark) return;
+        const field = meMark === 'X' ? 'cx' : 'co';
+        if (g[field]) return; // choice locked once made
+        const cx = meMark === 'X' ? choice : g.cx;
+        const co = meMark === 'O' ? choice : g.co;
+        const update = {};
+        update[field] = choice;
+        if (cx && co) update.winner = cx === co ? 'draw' : (rpsBeats(cx, co) ? 'X' : 'O');
+        ref.update(update);
+        if (navigator.vibrate) navigator.vibrate(10);
+        if (update.winner) sendPush(currentChatId, update.winner === 'draw' ? '🎮 تعادل (حجرة ورقة مقص)' : '🎮 انتهت جولة حجرة ورقة مقص');
+      });
+    }
+
+    function renderRPS(msg, key) {
+      const meMark = msg.px === currentUser ? 'X' : (msg.po === currentUser ? 'O' : '');
+      const myChoice = meMark === 'X' ? msg.cx : (meMark === 'O' ? msg.co : '');
+      const theirChoice = meMark === 'X' ? msg.co : (meMark === 'O' ? msg.cx : '');
+      const emo = { r: '✊', p: '✋', s: '✌️' };
+      const done = !!msg.winner;
+      let body = '', status;
+      const k = escapeAttr(key);
+      if (done) {
+        if (msg.winner === 'draw') status = 'تعادل 🤝';
+        else status = meMark ? (msg.winner === meMark ? 'فزت! 🎉' : 'خسرت 😅') : `فاز ${msg.winner}`;
+        body = `<div class="rps-reveal"><div class="rps-side"><span class="rps-emo">${emo[myChoice] || '❔'}</span><span class="rps-lbl">أنت</span></div><span class="rps-vs">×</span><div class="rps-side"><span class="rps-emo">${emo[theirChoice] || '❔'}</span><span class="rps-lbl">الطرف الثاني</span></div></div>`;
+      } else if (!meMark) {
+        status = 'لعبة جارية…';
+      } else if (!myChoice) {
+        status = 'اختر:';
+        body = `<div class="rps-choices"><button class="rps-btn" onclick="rpsPick('${k}','r')">✊</button><button class="rps-btn" onclick="rpsPick('${k}','p')">✋</button><button class="rps-btn" onclick="rpsPick('${k}','s')">✌️</button></div>`;
+      } else {
+        status = `اخترت ${emo[myChoice]} — بانتظار الطرف الثاني…`;
+      }
+      return `<div class="rps-game${done ? ' xo-done' : ''}"><div class="xo-title">✊✋✌️ حجرة ورقة مقص</div>${body}<div class="xo-status">${escapeHtml(status)}</div></div>`;
     }
 
     function xoWinnerOf(b) {
