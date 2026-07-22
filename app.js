@@ -1378,39 +1378,89 @@
     /* ==========================================================
        SCROLL
     ========================================================== */
-    // Swipe the chat right-to-left (leftward) to leave it — Saud only. Binds
-    // once; triggers when the swipe starts from the right edge or on empty
-    // chat space, so it never clashes with per-message swipe-to-reply.
+    // Interactive swipe-to-exit — Saud only. Drag the chat right-to-left and
+    // the page follows your finger, revealing home beneath; release past a
+    // third of the width (or a quick flick) to leave, otherwise it snaps back.
+    // Starts from the right edge or empty chat space so it never clashes with
+    // per-message swipe-to-reply. Binds once.
     function setupChatExitSwipe() {
       const area = $('messages-area');
       if (!area || area._exitSwipeBound) return;
       area._exitSwipeBound = true;
-      let sx = 0, sy = 0, tracking = false;
+      const chat = $('page-chat');
+      const home = $('page-home');
+      let sx = 0, sy = 0, t0 = 0, width = 1;
+      let active = false, decided = false, dragging = false;
+
       area.addEventListener('touchstart', (e) => {
-        if (currentUser !== 'saud' || e.touches.length !== 1) { tracking = false; return; }
+        active = false; decided = false; dragging = false;
+        if (currentUser !== 'saud' || e.touches.length !== 1) return;
         const t = e.touches[0];
-        sx = t.clientX; sy = t.clientY;
-        const fromEdge = (window.innerWidth - sx) <= 44;
+        sx = t.clientX; sy = t.clientY; t0 = Date.now();
+        width = window.innerWidth || 1;
+        const fromEdge = (width - sx) <= 44;
         const onMessage = e.target.closest && e.target.closest('.message');
-        tracking = fromEdge || !onMessage;
+        active = fromEdge || !onMessage;
       }, { passive: true });
+
       area.addEventListener('touchmove', (e) => {
-        if (!tracking) return;
+        if (!active) return;
         const t = e.touches[0];
-        if (Math.abs(t.clientY - sy) > Math.abs(t.clientX - sx)) tracking = false; // vertical scroll
-      }, { passive: true });
-      const finish = (e) => {
-        if (!tracking) return;
-        tracking = false;
-        const t = e.changedTouches[0];
         const dx = t.clientX - sx, dy = t.clientY - sy;
-        if (dx <= -70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-          if (navigator.vibrate) navigator.vibrate(10);
-          exitChatSmoothly('/');
+        if (!decided) {
+          if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+          decided = true;
+          // Only a leftward, mostly-horizontal drag starts the exit.
+          if (!(dx < 0 && Math.abs(dx) > Math.abs(dy) + 2)) { active = false; return; }
+          dragging = true;
+          if ($('chat-list') && !$('chat-list').children.length) showHome();
+          home.classList.add('active');
+          chat.style.transition = 'none';
+          chat.style.zIndex = '50';
+          chat.style.boxShadow = '-8px 0 24px rgba(0,0,0,0.18)';
+        }
+        if (!dragging) return;
+        e.preventDefault();
+        chat.style.transform = `translateX(${Math.min(0, dx)}px)`;
+      }, { passive: false });
+
+      const end = (e) => {
+        if (!dragging) { active = false; return; }
+        dragging = false; active = false;
+        const t = (e.changedTouches && e.changedTouches[0]) || {};
+        const dx = (t.clientX || sx) - sx;
+        const fast = (Date.now() - t0) < 300 && dx < -60;
+        const past = Math.abs(dx) > width * 0.33 || fast;
+        chat.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+        if (past) {
+          if (navigator.vibrate) navigator.vibrate(8);
+          chat.style.transform = 'translateX(-100%)';
+          const done = () => {
+            chat.removeEventListener('transitionend', done);
+            history.pushState(null, '', '/');
+            cleanup();
+            currentView = 'home';
+            showHome();
+            chat.classList.remove('active');
+            chat.style.transition = ''; chat.style.transform = '';
+            chat.style.zIndex = ''; chat.style.boxShadow = '';
+          };
+          chat.addEventListener('transitionend', done, { once: true });
+          setTimeout(done, 340);
+        } else {
+          chat.style.transform = 'translateX(0)';
+          const back = () => {
+            chat.removeEventListener('transitionend', back);
+            chat.style.transition = ''; chat.style.transform = '';
+            chat.style.zIndex = ''; chat.style.boxShadow = '';
+            home.classList.remove('active');
+          };
+          chat.addEventListener('transitionend', back, { once: true });
+          setTimeout(back, 300);
         }
       };
-      area.addEventListener('touchend', finish);
-      area.addEventListener('touchcancel', () => { tracking = false; });
+      area.addEventListener('touchend', end);
+      area.addEventListener('touchcancel', end);
     }
 
     // Flag the scroll-to-bottom button when a new message arrives while the
