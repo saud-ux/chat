@@ -351,6 +351,7 @@
         if (!btn) return;
         const distFromBottom = area.scrollHeight - area.scrollTop - area.clientHeight;
         btn.classList.toggle('visible', distFromBottom > 150);
+        if (distFromBottom <= 150) btn.classList.remove('has-new');
       });
 
       currentWallpaper = null;
@@ -384,6 +385,11 @@
       addListener(ref, 'child_added', snap => {
         const msg = snap.val();
         const isMine = msg.sender === user;
+
+        // Measure BEFORE appending: were we already near the bottom?
+        const wasNearBottom = area
+          ? (area.scrollHeight - area.scrollTop - area.clientHeight) < 150
+          : true;
 
         const msgDate = new Date(msg.timestamp);
         const dateStr = msgDate.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -425,7 +431,13 @@
         if (isFirstLoad[chatId]) {
           scrollToBottom(false);
         } else {
-          scrollToBottom(true);
+          // Only auto-scroll if it's my own message, or the reader was
+          // already at the bottom. Otherwise keep their place while reading.
+          if (isMine || wasNearBottom) {
+            scrollToBottom(true);
+          } else {
+            showNewMsgPill();
+          }
           if (!isMine) {
             const name = user === 'saud' ? CONTACTS[chatId].name : 'سعود';
             notify(chatId, name, msgPreview(msg));
@@ -1280,6 +1292,13 @@
     /* ==========================================================
        SCROLL
     ========================================================== */
+    // Flag the scroll-to-bottom button when a new message arrives while the
+    // reader is scrolled up, so they can jump down without being yanked there.
+    function showNewMsgPill() {
+      const btn = $('btn-scroll-bottom');
+      if (btn) btn.classList.add('visible', 'has-new');
+    }
+
     function scrollToBottom(smooth) {
       const area = $('messages-area');
       if (!area) return;
