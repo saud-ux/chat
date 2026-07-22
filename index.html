@@ -2289,7 +2289,13 @@
             }
           });
         });
+        setInterval(function() { reg.update(); }, 60000);
       }).catch(() => {});
+      navigator.serviceWorker.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'SW_UPDATED') {
+          window.location.reload();
+        }
+      });
     }
 
     route();
