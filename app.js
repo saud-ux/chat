@@ -82,6 +82,7 @@
     let activeListeners = [];
     let totalUnread = { w: 0, aseel: 0 };
     let isFirstLoad = {};
+    let pinnedToBottom = false;
     let audioCtx = null;
     let myMessages = [];
     let otherSeenTimestamp = 0;
@@ -380,12 +381,29 @@
       area.innerHTML = '';
 
       area.addEventListener('scroll', () => {
+        const distFromBottom = area.scrollHeight - area.scrollTop - area.clientHeight;
+        // Stay pinned to the newest message while the reader is at the bottom;
+        // release the pin the moment they scroll up to read history.
+        pinnedToBottom = distFromBottom < 120;
         const btn = $('btn-scroll-bottom');
         if (!btn) return;
-        const distFromBottom = area.scrollHeight - area.scrollTop - area.clientHeight;
         btn.classList.toggle('visible', distFromBottom > 150);
         if (distFromBottom <= 150) btn.classList.remove('has-new');
       });
+
+      // Media (images/GIFs/videos) load after layout and grow the page; while
+      // pinned to the bottom, snap back down so you always land on the last
+      // message when opening a chat.
+      if (!area._loadPinBound) {
+        area._loadPinBound = true;
+        area.addEventListener('load', (e) => {
+          const tag = e.target && e.target.tagName;
+          if (pinnedToBottom && (tag === 'IMG' || tag === 'VIDEO')) {
+            area.scrollTop = area.scrollHeight;
+          }
+        }, true); // capture: load doesn't bubble
+      }
+      pinnedToBottom = true; // start pinned on open
 
       setupChatExitSwipe();
 
