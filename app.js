@@ -303,6 +303,7 @@
 
     function msgPreview(msg) {
       if (msg.type === 'image') return '📷 صورة';
+      if (msg.type === 'gif') return '🎞️ GIF';
       if (msg.type === 'video') return '🎥 فيديو';
       if (msg.type === 'audio') return '🎤 رسالة صوتية';
       return msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
@@ -572,6 +573,9 @@
       if (recSend) recSend.onclick = () => stopRecording(true);
       const recCancel = $('rec-cancel');
       if (recCancel) recCancel.onclick = () => stopRecording(false);
+
+      const gifBtn = $('btn-gif');
+      if (gifBtn) gifBtn.onclick = openGifPicker;
 
       updateInputButtons();
     }
@@ -1267,12 +1271,14 @@
       let replyHtml = '';
       if (msg.replyTo) {
         const rName = msg.replyTo.sender === currentUser ? 'أنت' : (msg.replyTo.sender === 'saud' ? 'سعود' : (CONTACTS[msg.replyTo.sender] ? CONTACTS[msg.replyTo.sender].name : msg.replyTo.sender));
-        const rText = msg.replyTo.type === 'image' ? '📷 صورة' : msg.replyTo.type === 'video' ? '🎥 فيديو' : msg.replyTo.type === 'audio' ? '🎤 رسالة صوتية' : escapeHtml(msg.replyTo.text || '');
+        const rText = msg.replyTo.type === 'image' ? '📷 صورة' : msg.replyTo.type === 'gif' ? '🎞️ GIF' : msg.replyTo.type === 'video' ? '🎥 فيديو' : msg.replyTo.type === 'audio' ? '🎤 رسالة صوتية' : escapeHtml(msg.replyTo.text || '');
         replyHtml = `<div class="msg-reply-quote" onclick="scrollToMessage('${escapeAttr(msg.replyTo.key)}')"><div class="msg-reply-name">${rName}</div><span class="msg-reply-text">${rText}</span></div>`;
       }
       let content = '';
       if (msg.type === 'image') {
         content = `<img class="msg-image" src="${escapeAttr(msg.content)}" alt="صورة" loading="lazy" onclick="openViewer('${escapeAttr(msg.content)}')">`;
+      } else if (msg.type === 'gif') {
+        content = `<div class="msg-gif-wrap"><img class="msg-gif" src="${escapeAttr(msg.content)}" alt="GIF" loading="lazy" onclick="openViewer('${escapeAttr(msg.content)}')"><span class="msg-gif-tag">GIF</span></div>`;
       } else if (msg.type === 'video') {
         content = `<video class="msg-video" src="${escapeAttr(msg.content)}" controls playsinline preload="metadata"></video>`;
       } else if (msg.type === 'audio') {
@@ -1788,6 +1794,100 @@
           }
         }
       });
+    }
+
+    /* ==========================================================
+       GIF PICKER  (Trending suggestions + search, GIPHY)
+    ========================================================== */
+    const GIPHY_KEY = 'dc6zaTOxFJmzC'; // GIPHY public beta key
+    let gifSearchTimer = null;
+
+    function openGifPicker() {
+      if (document.getElementById('gif-overlay')) return;
+      const overlay = document.createElement('div');
+      overlay.id = 'gif-overlay';
+      overlay.className = 'gif-overlay';
+      overlay.onclick = (e) => { if (e.target === overlay) closeGifPicker(); };
+      overlay.innerHTML = `
+        <div class="gif-panel" onclick="event.stopPropagation()">
+          <div class="gif-search-row">
+            <input type="text" id="gif-search-input" class="gif-search-input" placeholder="ابحث عن GIF…" dir="auto" autocomplete="off">
+            <button class="gif-close" onclick="closeGifPicker()" aria-label="إغلاق">✕</button>
+          </div>
+          <div class="gif-grid" id="gif-grid"></div>
+          <div class="gif-attribution">مدعوم من GIPHY</div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const inp = document.getElementById('gif-search-input');
+      inp.addEventListener('input', () => {
+        clearTimeout(gifSearchTimer);
+        const q = inp.value.trim();
+        gifSearchTimer = setTimeout(() => loadGifs(q), 350);
+      });
+      loadGifs(''); // trending suggestions on open
+      setTimeout(() => inp.focus(), 80);
+    }
+
+    function closeGifPicker() {
+      clearTimeout(gifSearchTimer);
+      const o = document.getElementById('gif-overlay');
+      if (o) o.remove();
+    }
+
+    async function loadGifs(query) {
+      const grid = document.getElementById('gif-grid');
+      if (!grid) return;
+      grid.innerHTML = '<div class="gif-status">جاري التحميل…</div>';
+      const url = query
+        ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13&lang=ar`
+        : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=pg-13`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const items = (data && data.data) || [];
+        if (!items.length) {
+          grid.innerHTML = '<div class="gif-status">لا توجد نتائج</div>';
+          return;
+        }
+        // Guard against a late response from a previous query.
+        if (document.getElementById('gif-search-input')?.value.trim() !== query) return;
+        grid.innerHTML = '';
+        items.forEach(g => {
+          const img = g.images || {};
+          const thumb = (img.fixed_width_downsampled || img.fixed_width || img.downsized || {}).url;
+          const full = (img.downsized_medium || img.original || img.fixed_width || {}).url;
+          if (!thumb || !full) return;
+          const cell = document.createElement('button');
+          cell.className = 'gif-cell';
+          cell.innerHTML = `<img src="${escapeAttr(thumb)}" alt="GIF" loading="lazy">`;
+          cell.onclick = () => sendGif(full);
+          grid.appendChild(cell);
+        });
+      } catch (e) {
+        grid.innerHTML = '<div class="gif-status">تعذّر التحميل، تحقق من الاتصال</div>';
+      }
+    }
+
+    function sendGif(url) {
+      if (!currentChatId || !currentUser || !db) return;
+      const msgData = {
+        sender: currentUser,
+        type: 'gif',
+        content: url,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      };
+      if (replyToKey && replyToMsg) {
+        msgData.replyTo = {
+          key: replyToKey,
+          sender: replyToMsg.sender,
+          type: replyToMsg.type,
+          text: replyToMsg.type === 'text' ? (replyToMsg.content.length > 60 ? replyToMsg.content.substring(0, 60) + '...' : replyToMsg.content) : ''
+        };
+      }
+      db.ref(`chats/${currentChatId}/messages`).push(msgData);
+      sendPush(currentChatId, '🎞️ GIF');
+      cancelReply();
+      closeGifPicker();
     }
 
     /* ==========================================================

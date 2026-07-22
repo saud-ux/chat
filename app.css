@@ -838,3 +838,70 @@
       background: none; border: none; border-top: 1px solid var(--border);
       color: var(--muted); font-size: 15px; cursor: pointer; font-family: inherit;
     }
+
+    /* ===== GIF BUTTON & PICKER ===== */
+    .btn-gif {
+      background: none; border: 1.5px solid var(--muted); cursor: pointer;
+      color: var(--muted); border-radius: 8px; padding: 3px 6px;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+      line-height: 1; flex-shrink: 0; align-self: center;
+      font-family: inherit; transition: transform 0.1s, color 0.2s, border-color 0.2s;
+    }
+    .btn-gif:active { transform: scale(0.9); color: var(--accent); border-color: var(--accent); }
+
+    .msg-gif-wrap { position: relative; display: inline-block; line-height: 0; }
+    .msg-gif {
+      max-width: 100%; max-height: 260px; border-radius: 6px; cursor: pointer;
+      display: block; margin-bottom: 2px;
+    }
+    .msg-gif-tag {
+      position: absolute; top: 6px; right: 6px;
+      background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; font-weight: 800;
+      letter-spacing: 0.5px; padding: 2px 5px; border-radius: 4px; line-height: 1;
+    }
+
+    .gif-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      z-index: 999; display: flex; align-items: flex-end;
+      justify-content: center; animation: fadeIn 0.15s;
+    }
+    .gif-panel {
+      background: #fff; border-radius: 16px 16px 0 0;
+      padding: 12px; width: 100%; max-width: 500px;
+      padding-bottom: calc(12px + var(--safe-bottom));
+      display: flex; flex-direction: column;
+      max-height: 70vh; animation: slideUp 0.2s ease-out;
+    }
+    .gif-search-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .gif-search-input {
+      flex: 1; border: 1px solid var(--border); border-radius: 22px;
+      padding: 10px 16px; font-size: 15px; outline: none;
+      font-family: inherit; background: #f8f9fa; color: inherit;
+    }
+    .gif-search-input:focus { border-color: var(--accent); }
+    .gif-close {
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 20px; padding: 6px 8px; flex-shrink: 0; line-height: 1;
+    }
+    .gif-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+    .gif-cell {
+      background: #f0f0f0; border: none; cursor: pointer; padding: 0;
+      border-radius: 8px; overflow: hidden; line-height: 0;
+      transition: transform 0.1s; aspect-ratio: 1 / 1;
+    }
+    .gif-cell:active { transform: scale(0.95); }
+    .gif-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .gif-status {
+      grid-column: 1 / -1; text-align: center; color: var(--muted);
+      padding: 30px 0; font-size: 14px;
+    }
+    .gif-attribution {
+      text-align: center; color: var(--muted); font-size: 10px;
+      margin-top: 8px; opacity: 0.7;
+    }
+    :root[data-theme="dark"] .gif-panel { background: var(--header-bg); }
+    :root[data-theme="dark"] .gif-search-input { background: #2a3942; color: #e9edef; border-color: var(--border); }
+    :root[data-theme="dark"] .gif-cell { background: #2a3942; }
