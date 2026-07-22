@@ -1,4 +1,4 @@
-var CACHE_VERSION = 'v4';
+var CACHE_VERSION = 'v5';
 
 self.addEventListener('install', function(event) {
   self.skipWaiting();
@@ -13,6 +13,12 @@ self.addEventListener('activate', function(event) {
       );
     }).then(function() {
       return self.clients.claim();
+    }).then(function() {
+      return self.clients.matchAll({ type: 'window' });
+    }).then(function(clients) {
+      clients.forEach(function(client) {
+        client.postMessage({ type: 'SW_UPDATED' });
+      });
     })
   );
 });
