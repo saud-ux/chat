@@ -171,6 +171,25 @@
       route();
     }
 
+    // Leave the chat with a smooth slide-out. The real navigation happens
+    // instantly beneath a static clone of the chat that animates away, so
+    // state stays correct while the exit still looks smooth.
+    function exitChatSmoothly(path) {
+      path = path || '/';
+      const chat = $('page-chat');
+      if (!chat || !chat.classList.contains('active') || currentUser !== 'saud') { navigate(path); return; }
+      const ghost = chat.cloneNode(true);
+      ghost.id = 'page-chat-ghost';
+      ghost.classList.remove('page', 'active');
+      ghost.classList.add('page-ghost');
+      document.body.appendChild(ghost);
+      navigate(path); // real navigation (cleanup + home) under the ghost
+      requestAnimationFrame(() => ghost.classList.add('page-exit'));
+      const kill = () => { if (ghost.parentNode) ghost.remove(); };
+      ghost.addEventListener('animationend', kill, { once: true });
+      setTimeout(kill, 600);
+    }
+
     /* ==========================================================
        CLEANUP LISTENERS
     ========================================================== */
@@ -331,7 +350,7 @@
 
       const themeIcon = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
       $('chat-header').innerHTML = `
-        ${isSaud ? '<button class="btn-back" onclick="navigate(\'/\')">→</button>' : ''}
+        ${isSaud ? '<button class="btn-back" onclick="exitChatSmoothly(\'/\')">→</button>' : ''}
         <div class="chat-header-avatar" style="background:${partnerColor}">
           ${partnerAvatar}
         </div>
@@ -1357,7 +1376,7 @@
         const dx = t.clientX - sx, dy = t.clientY - sy;
         if (dx <= -70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
           if (navigator.vibrate) navigator.vibrate(10);
-          navigate('/');
+          exitChatSmoothly('/');
         }
       };
       area.addEventListener('touchend', finish);

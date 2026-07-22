@@ -29,6 +29,21 @@
     .page { display: none; flex-direction: column; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; }
     .page.active { display: flex; }
 
+    /* Smooth slide-out when leaving a chat (a static clone animates away) */
+    .page-ghost {
+      display: flex; flex-direction: column; position: fixed; inset: 0;
+      z-index: 50; will-change: transform, opacity; pointer-events: none;
+      box-shadow: -8px 0 24px rgba(0,0,0,0.18);
+    }
+    .page-ghost.page-exit { animation: pageExitLeft 0.28s cubic-bezier(0.33, 1, 0.68, 1) forwards; }
+    @keyframes pageExitLeft {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(-38%); opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .page-ghost { display: none; }
+    }
+
     .app-wrap {
       max-width: 500px; margin: 0 auto; width: 100%; height: 100%;
       display: flex; flex-direction: column; background: #fff;
