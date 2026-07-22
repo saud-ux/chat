@@ -852,10 +852,11 @@
       for (const c of candidates) {
         try { if (MediaRecorder.isTypeSupported(c)) { mime = c; break; } } catch (e) {}
       }
-      // Opus is efficient — 64kbps is transparent for speech. Lossy AAC/mp4
-      // (iOS Safari) needs more headroom to sound clean, so give it 128kbps.
+      // High-quality voice. Opus is efficient so 96kbps is already beyond
+      // transparent for speech; lossy AAC/mp4 (iOS Safari) is given 192kbps.
+      // Even at 192kbps a full 5-min note is ~7MB, well under the 15MB cap.
       const isOpus = /opus/i.test(mime);
-      const audioBitrate = isOpus ? 64000 : 128000;
+      const audioBitrate = isOpus ? 96000 : 192000;
       try {
         mediaRecorder = mime
           ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: audioBitrate })
