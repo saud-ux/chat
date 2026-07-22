@@ -1630,11 +1630,11 @@
       const msg = entry.msg;
       if (!msg || !msg.content || (msg.type !== 'gif' && msg.type !== 'image')) return;
       if (navigator.vibrate) navigator.vibrate(12);
-      db.ref('userStickers/' + currentUser).once('value', snap => {
+      db.ref('stickers').once('value', snap => {
         let exists = false;
         snap.forEach(ch => { const v = ch.val(); if (v && v.url === msg.content) exists = true; });
         if (exists) { miniToast('موجود في ستيكراتك ✓'); return; }
-        db.ref('userStickers/' + currentUser).push({
+        db.ref('stickers').push({
           url: msg.content,
           type: msg.type,
           timestamp: firebase.database.ServerValue.TIMESTAMP
@@ -2472,7 +2472,7 @@
       const grid = document.getElementById('gif-grid');
       if (!grid || !db) return;
       grid.innerHTML = '<div class="gif-status">جاري التحميل…</div>';
-      db.ref('userStickers/' + currentUser).once('value', snap => {
+      db.ref('stickers').once('value', snap => {
         if (gifTab !== 'stickers') return;
         grid.innerHTML = '';
         const add = document.createElement('button');
@@ -2534,7 +2534,7 @@
       for (const file of files) {
         try {
           const url = await uploadToCloudinary(file);
-          await db.ref('userStickers/' + currentUser).push({
+          await db.ref('stickers').push({
             url,
             type: file.type === 'image/gif' ? 'gif' : 'image',
             timestamp: firebase.database.ServerValue.TIMESTAMP
@@ -2551,7 +2551,7 @@
 
     function deleteSticker(key) {
       if (!db || !key) return;
-      db.ref('userStickers/' + currentUser + '/' + key).remove().then(() => { if (gifTab === 'stickers') loadStickers(); });
+      db.ref('stickers/' + key).remove().then(() => { if (gifTab === 'stickers') loadStickers(); });
     }
 
     /* ---- GIF search: Tenor (Arabic) with GIPHY fallback ---- */
