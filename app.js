@@ -309,6 +309,7 @@
       if (msg.type === 'gif') return '🎞️ GIF';
       if (msg.type === 'video') return '🎥 فيديو';
       if (msg.type === 'audio') return '🎤 رسالة صوتية';
+      if (msg.type === 'game') return '🎮 لعبة إكس أو';
       return msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
     }
 
@@ -336,6 +337,7 @@
         </div>
         <span class="chat-header-name">${partnerName}</span>
         <div style="display:flex;gap:2px;margin-right:auto;align-items:center">
+          <button class="btn-theme" onclick="startXO()" aria-label="لعبة إكس أو">🎮</button>
           <button class="btn-theme" onclick="toggleSearch()" aria-label="بحث">🔍</button>
           <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" aria-label="الوضع">${themeIcon}</button>
           <button class="btn-theme" onclick="openSettings()" aria-label="إعدادات">⚙️</button>
@@ -414,17 +416,21 @@
         if (isMine && !msg.deleted) {
           myMessages.push({ el, timestamp: msg.timestamp });
           updateSeenIndicator();
-          addTapGestures(el, () => { burstHearts(el); addReaction(snap.key, '❤️'); }, () => showMsgActions(snap.key, msg.type, true));
+          if (msg.type !== 'game') {
+            addTapGestures(el, () => { burstHearts(el); addReaction(snap.key, '❤️'); }, () => showMsgActions(snap.key, msg.type, true));
+            addSwipeReply(el, snap.key);
+          }
           addLongPress(el, () => showMsgActions(snap.key, msg.type, true));
-          addSwipeReply(el, snap.key);
         } else if (!isMine) {
           if (!isFirstLoad[chatId]) {
             db.ref(`chats/${chatId}/seen/${user}`).set(firebase.database.ServerValue.TIMESTAMP);
           }
           if (!msg.deleted) {
-            addTapGestures(el, () => { burstHearts(el); addReaction(snap.key, '❤️'); }, () => showMsgActions(snap.key, msg.type, false));
+            if (msg.type !== 'game') {
+              addTapGestures(el, () => { burstHearts(el); addReaction(snap.key, '❤️'); }, () => showMsgActions(snap.key, msg.type, false));
+              addSwipeReply(el, snap.key);
+            }
             addLongPress(el, () => showMsgActions(snap.key, msg.type, false));
-            addSwipeReply(el, snap.key);
           }
         }
 
@@ -1349,7 +1355,7 @@
       let replyHtml = '';
       if (msg.replyTo) {
         const rName = msg.replyTo.sender === currentUser ? 'أنت' : (msg.replyTo.sender === 'saud' ? 'سعود' : (CONTACTS[msg.replyTo.sender] ? CONTACTS[msg.replyTo.sender].name : msg.replyTo.sender));
-        const rText = msg.replyTo.type === 'image' ? '📷 صورة' : msg.replyTo.type === 'gif' ? '🎞️ GIF' : msg.replyTo.type === 'video' ? '🎥 فيديو' : msg.replyTo.type === 'audio' ? '🎤 رسالة صوتية' : escapeHtml(msg.replyTo.text || '');
+        const rText = msg.replyTo.type === 'image' ? '📷 صورة' : msg.replyTo.type === 'gif' ? '🎞️ GIF' : msg.replyTo.type === 'video' ? '🎥 فيديو' : msg.replyTo.type === 'audio' ? '🎤 رسالة صوتية' : msg.replyTo.type === 'game' ? '🎮 لعبة إكس أو' : escapeHtml(msg.replyTo.text || '');
         replyHtml = `<div class="msg-reply-quote" onclick="scrollToMessage('${escapeAttr(msg.replyTo.key)}')"><div class="msg-reply-name">${rName}</div><span class="msg-reply-text">${rText}</span></div>`;
       }
       let content = '';
@@ -1362,6 +1368,8 @@
         content = `<video class="msg-video" src="${escapeAttr(msg.content)}" controls playsinline preload="metadata"></video>`;
       } else if (msg.type === 'audio') {
         content = `<div class="msg-audio" data-audio="${escapeAttr(msg.content)}" data-dur="${msg.duration || 0}"><button class="audio-play" onclick="toggleAudioPlay(this)">▶</button><div class="audio-body"><div class="audio-wave" onclick="seekAudio(event, this)">${waveBarsHtml(msg.content, 34)}</div><span class="audio-dur">${formatDur(msg.duration || 0)}</span></div><button class="audio-speed" onclick="cycleAudioSpeed(this)">${audioSpeed}x</button></div>`;
+      } else if (msg.type === 'game') {
+        content = renderXO(msg, el.dataset.key);
       } else {
         const ec = emojiOnlyCount(msg.content);
         bigEmoji = ec > 0;
@@ -1502,6 +1510,73 @@
       t.textContent = text;
       document.body.appendChild(t);
       setTimeout(() => { t.classList.add('hide'); setTimeout(() => t.remove(), 260); }, 1300);
+    }
+
+    /* ==========================================================
+       IN-CHAT GAME: TIC-TAC-TOE (إكس أو)
+       Stored as a 'game' message so both players share live state.
+    ========================================================== */
+    function startXO() {
+      if (!currentChatId || !currentUser || !db) return;
+      const other = currentUser === 'saud' ? currentChatId : 'saud';
+      db.ref(`chats/${currentChatId}/messages`).push({
+        sender: currentUser,
+        type: 'game',
+        game: 'xo',
+        board: '_________',
+        turn: 'X',
+        px: currentUser,   // starter is X
+        po: other,
+        winner: '',
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+      sendPush(currentChatId, '🎮 بدأ لعبة إكس أو');
+    }
+
+    function xoWinnerOf(b) {
+      const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      for (const [a, c, d] of lines) {
+        if (b[a] !== '_' && b[a] === b[c] && b[c] === b[d]) return b[a];
+      }
+      return b.indexOf('_') === -1 ? 'draw' : '';
+    }
+
+    function xoMove(key, i) {
+      if (!currentChatId || !db) return;
+      const ref = db.ref(`chats/${currentChatId}/messages/${key}`);
+      ref.once('value', snap => {
+        const g = snap.val();
+        if (!g || g.type !== 'game' || g.winner) return;
+        const board = (g.board || '_________').split('');
+        if (board[i] !== '_') return;
+        const myMark = g.px === currentUser ? 'X' : (g.po === currentUser ? 'O' : null);
+        if (!myMark || myMark !== g.turn) return; // not your turn / not a player
+        board[i] = myMark;
+        const nb = board.join('');
+        const w = xoWinnerOf(nb);
+        ref.update({ board: nb, turn: g.turn === 'X' ? 'O' : 'X', winner: w });
+        if (navigator.vibrate) navigator.vibrate(10);
+        if (w) sendPush(currentChatId, w === 'draw' ? '🎮 تعادل في إكس أو' : '🎮 انتهت لعبة إكس أو');
+      });
+    }
+
+    function renderXO(msg, key) {
+      const b = (msg.board || '_________').split('');
+      const meMark = msg.px === currentUser ? 'X' : (msg.po === currentUser ? 'O' : '');
+      let status, done = !!msg.winner;
+      if (msg.winner === 'draw') {
+        status = 'تعادل 🤝';
+      } else if (msg.winner) {
+        status = meMark ? (msg.winner === meMark ? 'فزت! 🎉' : 'خسرت 😅') : `فاز ${msg.winner}`;
+      } else {
+        const turnUser = msg.turn === 'X' ? msg.px : msg.po;
+        status = turnUser === currentUser ? 'دورك ✋' : 'دور الطرف الثاني…';
+      }
+      const cells = b.map((c, i) => {
+        const cls = c === 'X' ? 'xo-x' : c === 'O' ? 'xo-o' : '';
+        return `<button class="xo-cell ${cls}" onclick="xoMove('${escapeAttr(key)}',${i})">${c === '_' ? '' : c}</button>`;
+      }).join('');
+      return `<div class="xo-game${done ? ' xo-done' : ''}"><div class="xo-title">🎮 إكس أو</div><div class="xo-board">${cells}</div><div class="xo-status">${escapeHtml(status)}</div></div>`;
     }
 
     function editMessage(key) {

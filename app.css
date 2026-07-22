@@ -1034,3 +1034,30 @@
     @keyframes miniToastOut {
       to { opacity: 0; transform: translate(-50%, 8px); }
     }
+
+    /* ===== IN-CHAT GAME: TIC-TAC-TOE ===== */
+    .xo-game { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 2px 0; }
+    .xo-title { font-size: 13px; font-weight: 700; opacity: 0.85; }
+    .xo-board {
+      display: grid; grid-template-columns: repeat(3, 56px);
+      grid-template-rows: repeat(3, 56px); gap: 4px;
+    }
+    .xo-cell {
+      border: none; border-radius: 10px; cursor: pointer;
+      font-size: 30px; font-weight: 800; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.28); color: inherit;
+      transition: transform 0.08s, background 0.2s;
+      font-family: system-ui, sans-serif;
+    }
+    .message-theirs .xo-cell { background: rgba(0,0,0,0.07); }
+    .xo-cell:active { transform: scale(0.92); }
+    .xo-cell.xo-x { color: #fbbf24; }
+    .xo-cell.xo-o { color: #38bdf8; }
+    .xo-status {
+      font-size: 13px; font-weight: 700; min-height: 16px;
+      background: rgba(0,0,0,0.12); padding: 3px 12px; border-radius: 12px;
+    }
+    .message-mine .xo-status { background: rgba(255,255,255,0.22); }
+    .xo-done .xo-board { opacity: 0.65; }
+    :root[data-theme="dark"] .message-theirs .xo-cell { background: rgba(255,255,255,0.1); }
