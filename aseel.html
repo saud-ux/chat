@@ -63,8 +63,16 @@
     .home-logo { width: 36px; height: 36px; flex-shrink: 0; }
 
     .home-title {
-      font-size: 22px; font-weight: 700; color: #1a1a1a;
+      font-size: 22px; font-weight: 700; color: #1a1a1a; flex: 1;
     }
+
+    .btn-refresh {
+      background: none; border: none; cursor: pointer; font-size: 20px;
+      padding: 6px; display: flex; align-items: center; color: var(--muted);
+      transition: transform 0.3s;
+    }
+    .btn-refresh.spinning { animation: spin 0.8s linear; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
     .chat-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
@@ -652,6 +660,20 @@
       font-family: inherit; margin-top: 8px; text-align: center;
     }
 
+    /* ===== SCROLL TO BOTTOM BUTTON ===== */
+    .btn-scroll-bottom {
+      position: absolute; bottom: 80px; left: 16px;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--header-bg); border: 1px solid var(--border);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      cursor: pointer; display: none; align-items: center;
+      justify-content: center; z-index: 10;
+      font-size: 18px; color: var(--muted);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .btn-scroll-bottom.visible { display: flex; animation: fadeIn 0.2s; }
+    .btn-scroll-bottom:active { transform: scale(0.9); }
+
     /* ===== SEARCH ===== */
     .search-bar {
       background: var(--header-bg); padding: 8px 16px;
@@ -718,6 +740,7 @@
             <circle cx="29" cy="22.5" r="1.8" fill="#5B8FB9"/>
           </svg>
           <h1 class="home-title">رسائل</h1>
+          <button class="btn-refresh" id="btn-refresh-home" onclick="forceUpdate(this)" aria-label="تحديث">🔄</button>
         </header>
         <div id="chat-list" class="chat-list"></div>
       </div>
@@ -728,6 +751,7 @@
       <div class="app-wrap">
         <header id="chat-header" class="chat-header"></header>
         <div id="messages-area" class="messages-area"></div>
+        <button id="btn-scroll-bottom" class="btn-scroll-bottom" onclick="scrollToBottom(true)">↓</button>
         <div id="media-preview" class="media-preview-bar" style="display:none"></div>
         <div id="edit-indicator" class="edit-indicator" style="display:none">
           <span>✏️ تعديل الرسالة</span>
@@ -1115,11 +1139,19 @@
           <button class="btn-theme" onclick="toggleSearch()" aria-label="بحث">🔍</button>
           <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" aria-label="الوضع">${themeIcon}</button>
           <button class="btn-theme" onclick="openSettings()" aria-label="إعدادات">⚙️</button>
+          <button class="btn-refresh" onclick="forceUpdate(this)" aria-label="تحديث">🔄</button>
           ${isSaud ? `<button class="btn-theme" onclick="clearChat('${chatId}')" aria-label="حذف الكل">🗑️</button>` : ''}
         </div>`;
 
       const area = $('messages-area');
       area.innerHTML = '';
+
+      area.addEventListener('scroll', () => {
+        const btn = $('btn-scroll-bottom');
+        if (!btn) return;
+        const distFromBottom = area.scrollHeight - area.scrollTop - area.clientHeight;
+        btn.classList.toggle('visible', distFromBottom > 150);
+      });
 
       currentWallpaper = null;
       area.style.backgroundImage = '';
@@ -1173,17 +1205,17 @@
         allMsgElements.push({ el, key: snap.key, msg });
         knownReactions[snap.key] = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
 
-        addDoubleTap(el, () => openReactionPicker(snap.key));
-
         if (isMine && !msg.deleted) {
           myMessages.push({ el, timestamp: msg.timestamp });
           updateSeenIndicator();
+          addDoubleTap(el, () => showMsgActions(snap.key, msg.type, true));
           addLongPress(el, () => showMsgActions(snap.key, msg.type, true));
         } else if (!isMine) {
           if (!isFirstLoad[chatId]) {
             db.ref(`chats/${chatId}/seen/${user}`).set(firebase.database.ServerValue.TIMESTAMP);
           }
-          if (isSaud && !msg.deleted) {
+          if (!msg.deleted) {
+            addDoubleTap(el, () => showMsgActions(snap.key, msg.type, false));
             addLongPress(el, () => showMsgActions(snap.key, msg.type, false));
           }
         }
@@ -1692,6 +1724,9 @@
       let html = '';
       html += `<button class="msg-action-btn" onclick="setReply('${key}')">↩️ رد</button>`;
       html += `<button class="msg-action-btn" onclick="hideMsgActions();openReactionPicker('${key}')">😀 تفاعل</button>`;
+      if (msgType === 'text') {
+        html += `<button class="msg-action-btn" onclick="copyMessage('${key}')">📋 نسخ</button>`;
+      }
       if (canEdit && msgType === 'text') {
         html += `<button class="msg-action-btn" onclick="editMessage('${key}')">✏️ تعديل</button>`;
       }
@@ -1711,6 +1746,13 @@
         deleted: true,
         content: ''
       });
+    }
+
+    function copyMessage(key) {
+      hideMsgActions();
+      const entry = allMsgElements.find(m => m.key === key);
+      if (!entry || entry.msg.type !== 'text') return;
+      navigator.clipboard.writeText(entry.msg.content).catch(() => {});
     }
 
     function editMessage(key) {
@@ -2214,6 +2256,24 @@
       const settingsOverlay = document.getElementById('settings-overlay');
       if (settingsOverlay) settingsOverlay.remove();
       openSettings();
+    }
+
+    /* ==========================================================
+       FORCE UPDATE (PWA)
+    ========================================================== */
+    function forceUpdate(btn) {
+      if (btn) { btn.classList.add('spinning'); btn.disabled = true; }
+      caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))).then(() => {
+        if ('serviceWorker' in navigator) {
+          return navigator.serviceWorker.getRegistration().then(reg => {
+            if (reg) return reg.update();
+          });
+        }
+      }).then(() => {
+        window.location.reload();
+      }).catch(() => {
+        window.location.reload();
+      });
     }
 
     /* ==========================================================
