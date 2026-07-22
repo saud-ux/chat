@@ -144,6 +144,41 @@
       color: var(--muted); margin-top: 40px; font-size: 15px;
     }
 
+    /* ===== CHAT LOADING SKELETON ===== */
+    .chat-skeleton { display: flex; flex-direction: column; gap: 12px; padding: 8px 2px; }
+    .skel-row { display: flex; }
+    .skel-row.skel-out { justify-content: flex-start; }
+    .skel-row.skel-in { justify-content: flex-end; }
+    .skel-bubble {
+      height: 40px; border-radius: 14px; max-width: 75%;
+      background: linear-gradient(100deg,
+        rgba(0,0,0,0.05) 30%, rgba(0,0,0,0.10) 50%, rgba(0,0,0,0.05) 70%);
+      background-size: 300% 100%;
+      animation: skel-shimmer 1.3s ease-in-out infinite;
+    }
+    .skel-row.skel-out .skel-bubble {
+      background: linear-gradient(100deg,
+        rgba(91,143,185,0.16) 30%, rgba(91,143,185,0.30) 50%, rgba(91,143,185,0.16) 70%);
+      background-size: 300% 100%;
+    }
+    @keyframes skel-shimmer {
+      0% { background-position: 150% 0; }
+      100% { background-position: -150% 0; }
+    }
+    :root[data-theme="dark"] .skel-bubble {
+      background: linear-gradient(100deg,
+        rgba(255,255,255,0.05) 30%, rgba(255,255,255,0.11) 50%, rgba(255,255,255,0.05) 70%);
+      background-size: 300% 100%;
+    }
+    :root[data-theme="dark"] .skel-row.skel-out .skel-bubble {
+      background: linear-gradient(100deg,
+        rgba(91,143,185,0.20) 30%, rgba(91,143,185,0.38) 50%, rgba(91,143,185,0.20) 70%);
+      background-size: 300% 100%;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .skel-bubble { animation: none; }
+    }
+
     .date-separator {
       text-align: center; margin: 12px 0 8px;
     }
@@ -395,7 +430,16 @@
       position: absolute; top: 0; right: 0; height: 100%; width: 0%;
       border-radius: 2px; background: currentColor; opacity: 0.9;
     }
+    .audio-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .audio-dur { font-size: 11px; opacity: 0.75; direction: ltr; text-align: right; }
+    .audio-speed {
+      font-size: 11px; font-weight: 700; line-height: 1; direction: ltr;
+      border: none; cursor: pointer; padding: 3px 7px; border-radius: 9px;
+      background: rgba(255,255,255,0.28); color: inherit; font-family: inherit;
+      flex-shrink: 0; min-width: 30px; text-align: center;
+    }
+    .audio-speed:active { transform: scale(0.92); }
+    .message-theirs .audio-speed { background: rgba(0,0,0,0.10); }
 
     .media-preview-bar {
       background: #fff; padding: 8px 16px; border-top: 1px solid var(--border);

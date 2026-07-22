@@ -77,6 +77,8 @@
     let recFinalDuration = 0;
     let currentAudioEl = null;
     let currentAudioBtn = null;
+    const AUDIO_RATES = [1, 1.5, 2];
+    let audioRate = parseFloat(localStorage.getItem('audioRate')) || 1;
     let activeListeners = [];
     let totalUnread = { w: 0, aseel: 0 };
     let isFirstLoad = {};
@@ -341,6 +343,7 @@
 
       const area = $('messages-area');
       area.innerHTML = '';
+      showChatSkeleton(area);
 
       area.addEventListener('scroll', () => {
         const btn = $('btn-scroll-bottom');
@@ -377,7 +380,11 @@
       const ref = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp');
       let lastDateStr = '';
 
+      // Remove skeleton once the initial data has loaded (covers empty chats too)
+      ref.once('value', () => { if (currentChatId === chatId) clearChatSkeleton(); });
+
       addListener(ref, 'child_added', snap => {
+        clearChatSkeleton();
         const msg = snap.val();
         const isMine = msg.sender === user;
 
@@ -952,6 +959,7 @@
       }
 
       const audio = new Audio(wrap.getAttribute('data-audio'));
+      audio.playbackRate = audioRate;
       currentAudioEl = audio;
       currentAudioBtn = btn;
 
@@ -963,6 +971,20 @@
         if (d && progress) progress.style.width = Math.min(100, (audio.currentTime / d) * 100) + '%';
       };
       audio.play().catch(() => {});
+    }
+
+    function rateLabel(r) {
+      return r + '×';
+    }
+
+    function cycleAudioSpeed(btn, e) {
+      if (e) e.stopPropagation();
+      const idx = AUDIO_RATES.indexOf(audioRate);
+      audioRate = AUDIO_RATES[(idx + 1) % AUDIO_RATES.length];
+      localStorage.setItem('audioRate', audioRate);
+      const label = rateLabel(audioRate);
+      document.querySelectorAll('.audio-speed').forEach(b => { b.textContent = label; });
+      if (currentAudioEl) currentAudioEl.playbackRate = audioRate;
     }
 
     function seekAudio(e, wave) {
@@ -1222,6 +1244,28 @@
     /* ==========================================================
        SCROLL
     ========================================================== */
+    function showChatSkeleton(area) {
+      // Alternating incoming/outgoing placeholder bubbles while messages load
+      const rows = [
+        ['in', 62], ['in', 44], ['out', 70], ['in', 52],
+        ['out', 40], ['out', 58], ['in', 66], ['out', 48]
+      ];
+      const skel = document.createElement('div');
+      skel.className = 'chat-skeleton';
+      skel.setAttribute('aria-hidden', 'true');
+      skel.innerHTML = rows.map(([side, w]) =>
+        `<div class="skel-row skel-${side}"><div class="skel-bubble" style="width:${w}%"></div></div>`
+      ).join('');
+      area.appendChild(skel);
+    }
+
+    function clearChatSkeleton() {
+      const a = $('messages-area');
+      if (!a) return;
+      const skel = a.querySelector('.chat-skeleton');
+      if (skel) skel.remove();
+    }
+
     function scrollToBottom(smooth) {
       const area = $('messages-area');
       if (!area) return;
@@ -1252,7 +1296,7 @@
       } else if (msg.type === 'video') {
         content = `<video class="msg-video" src="${escapeAttr(msg.content)}" controls playsinline preload="metadata"></video>`;
       } else if (msg.type === 'audio') {
-        content = `<div class="msg-audio" data-audio="${escapeAttr(msg.content)}" data-dur="${msg.duration || 0}"><button class="audio-play" onclick="toggleAudioPlay(this)">▶</button><div class="audio-body"><div class="audio-wave" onclick="seekAudio(event, this)"><div class="audio-progress"></div></div><span class="audio-dur">${formatDur(msg.duration || 0)}</span></div></div>`;
+        content = `<div class="msg-audio" data-audio="${escapeAttr(msg.content)}" data-dur="${msg.duration || 0}"><button class="audio-play" onclick="toggleAudioPlay(this)">▶</button><div class="audio-body"><div class="audio-wave" onclick="seekAudio(event, this)"><div class="audio-progress"></div></div><div class="audio-meta"><span class="audio-dur">${formatDur(msg.duration || 0)}</span><button class="audio-speed" onclick="cycleAudioSpeed(this, event)">${rateLabel(audioRate)}</button></div></div></div>`;
       } else {
         content = `<div class="msg-text">${escapeHtml(msg.content)}</div>`;
       }
@@ -1832,27 +1876,42 @@
       const file = input.files[0];
       if (!file) return;
       input.value = '';
+
+      const overlay = $('upload-overlay');
+      const fill = $('upload-fill');
+      const text = $('upload-text');
+      if (overlay) { overlay.style.display = 'flex'; fill.style.width = '20%'; text.textContent = 'جاري التحضير...'; }
+
       const reader = new FileReader();
       reader.onload = () => {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const maxW = 1080;
+          const maxW = 1440;
           let w = img.width, h = img.height;
           if (w > maxW) { h = Math.round((maxW / w) * h); w = maxW; }
           canvas.width = w; canvas.height = h;
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-          try {
-            db.ref(`chats/${currentChatId}/wallpaper`).set(dataUrl);
-          } catch(e) {
-            alert('الصورة كبيرة جداً، اختر صورة أصغر');
-            return;
-          }
-          const settingsOverlay = document.getElementById('settings-overlay');
-          if (settingsOverlay) settingsOverlay.remove();
-          openSettings();
+          canvas.toBlob(async (blob) => {
+            if (!blob) { if (overlay) overlay.style.display = 'none'; alert('تعذّر تجهيز الصورة، حاول مرة أخرى.'); return; }
+            try {
+              if (fill) fill.style.width = '35%';
+              if (text) text.textContent = 'جاري الرفع...';
+              const url = await uploadToCloudinary(blob, (p) => {
+                if (fill) fill.style.width = (35 + p * 63) + '%';
+              });
+              await db.ref(`chats/${currentChatId}/wallpaper`).set(url);
+              if (fill) fill.style.width = '100%';
+            } catch (e) {
+              alert('فشل رفع الخلفية، حاول مرة أخرى.');
+            }
+            if (overlay) overlay.style.display = 'none';
+            const settingsOverlay = document.getElementById('settings-overlay');
+            if (settingsOverlay) settingsOverlay.remove();
+            openSettings();
+          }, 'image/jpeg', 0.82);
         };
+        img.onerror = () => { if (overlay) overlay.style.display = 'none'; alert('تعذّر قراءة الصورة.'); };
         img.src = reader.result;
       };
       reader.readAsDataURL(file);
