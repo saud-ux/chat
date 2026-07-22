@@ -1799,7 +1799,7 @@
     /* ==========================================================
        GIF PICKER  (Trending suggestions + search, GIPHY)
     ========================================================== */
-    const GIPHY_KEY = 'dc6zaTOxFJmzC'; // GIPHY public beta key
+    const GIPHY_KEY = 'YKbmWpQqVRfRU3vt8j0IVzONuKKNyKSj'; // GIPHY API key
     let gifSearchTimer = null;
 
     function openGifPicker() {
