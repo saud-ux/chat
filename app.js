@@ -1841,9 +1841,18 @@
       const url = query
         ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13&lang=ar`
         : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=pg-13`;
+      if (!GIPHY_KEY || GIPHY_KEY === 'YOUR_GIPHY_KEY') {
+        grid.innerHTML = '<div class="gif-status">يلزم مفتاح GIPHY لتفعيل الـ GIF</div>';
+        return;
+      }
       try {
         const res = await fetch(url);
         const data = await res.json();
+        const status = data && data.meta && data.meta.status;
+        if (status && status >= 400) {
+          grid.innerHTML = '<div class="gif-status">مفتاح GIPHY غير صالح أو تجاوز الحد</div>';
+          return;
+        }
         const items = (data && data.data) || [];
         if (!items.length) {
           grid.innerHTML = '<div class="gif-status">لا توجد نتائج</div>';
