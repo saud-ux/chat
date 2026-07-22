@@ -469,6 +469,9 @@
         updateSeenIndicator();
       });
 
+      // Mark seen immediately on open so the double-tick reaches the sender fast
+      db.ref(`chats/${chatId}/seen/${user}`).set(firebase.database.ServerValue.TIMESTAMP);
+
       setTimeout(() => {
         isFirstLoad[chatId] = false;
         scrollToBottom(false);
@@ -1203,6 +1206,7 @@
           fetch('/.netlify/functions/send-push', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            keepalive: true,
             body: JSON.stringify({
               subscription: sub,
               title: senderName,
@@ -1468,8 +1472,16 @@
     /* ==========================================================
        TYPING INDICATOR
     ========================================================== */
+    function markSeen() {
+      if (!currentChatId || !currentUser || !db) return;
+      if (currentView !== 'chat' && currentView !== 'person') return;
+      if (document.hidden) return;
+      db.ref(`chats/${currentChatId}/seen/${currentUser}`).set(firebase.database.ServerValue.TIMESTAMP);
+    }
+
     function setTyping() {
       if (!currentChatId || !currentUser || !db) return;
+      markSeen();
       db.ref(`chats/${currentChatId}/typing/${currentUser}`).set(true);
       clearTimeout(typingTimer);
       typingTimer = setTimeout(() => {
@@ -1908,3 +1920,10 @@
     ensureMsgInputShim();
     route();
     window.addEventListener('popstate', route);
+
+    // Re-confirm "seen" the moment the user returns to an open chat, so the
+    // sender's tick flips to double without waiting for a new message.
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) markSeen();
+    });
+    window.addEventListener('focus', markSeen);
