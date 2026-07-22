@@ -928,3 +928,52 @@
     :root[data-theme="dark"] .gif-panel { background: var(--header-bg); }
     :root[data-theme="dark"] .gif-search-input { background: #2a3942; color: #e9edef; border-color: var(--border); }
     :root[data-theme="dark"] .gif-cell { background: #2a3942; }
+
+    /* ===== EXTRA MOTION / MICRO-INTERACTIONS ===== */
+    /* Floating hearts on double-tap */
+    .heart-float {
+      position: fixed; z-index: 1000; pointer-events: none;
+      font-size: 26px; will-change: transform, opacity;
+      transform: translate(-50%, -50%);
+      animation: heartFloat 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    @keyframes heartFloat {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+      20%  { opacity: 1; transform: translate(-50%, -95%) scale(var(--sc, 1)); }
+      100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), -270%) scale(var(--sc, 1)) rotate(var(--rot, 0deg)); }
+    }
+
+    /* Button press feedback */
+    .btn-send { transition: background 0.2s, transform 0.1s; }
+    .btn-send:active { transform: scale(0.86); }
+    .btn-attach { transition: transform 0.1s, color 0.2s; }
+    .btn-attach:active { transform: scale(0.84); }
+    .btn-theme:active, .btn-refresh:active { transform: scale(0.85); }
+    .btn-scroll-bottom { transition: transform 0.12s, opacity 0.2s; }
+    .btn-scroll-bottom:active { transform: scale(0.88); }
+
+    /* Pop-in for GIFs and stickers */
+    .msg-gif { animation: gifPop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes gifPop {
+      0% { transform: scale(0.55); opacity: 0; }
+      60% { opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Reaction chip pops when it appears */
+    .msg-reaction { animation: reactChipIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes reactChipIn {
+      0% { transform: scale(0); }
+      100% { transform: scale(1); }
+    }
+
+    /* Sticker cells pop as the pack loads */
+    .gif-cell { animation: cellFade 0.25s ease-out; }
+    @keyframes cellFade {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .heart-float, .msg-gif, .msg-reaction, .gif-cell { animation: none; }
+    }

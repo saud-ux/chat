@@ -405,7 +405,7 @@
         if (isMine && !msg.deleted) {
           myMessages.push({ el, timestamp: msg.timestamp });
           updateSeenIndicator();
-          addTapGestures(el, () => addReaction(snap.key, '❤️'), () => showMsgActions(snap.key, msg.type, true));
+          addTapGestures(el, () => { burstHearts(el); addReaction(snap.key, '❤️'); }, () => showMsgActions(snap.key, msg.type, true));
           addLongPress(el, () => showMsgActions(snap.key, msg.type, true));
           addSwipeReply(el, snap.key);
         } else if (!isMine) {
@@ -413,7 +413,7 @@
             db.ref(`chats/${chatId}/seen/${user}`).set(firebase.database.ServerValue.TIMESTAMP);
           }
           if (!msg.deleted) {
-            addTapGestures(el, () => addReaction(snap.key, '❤️'), () => showMsgActions(snap.key, msg.type, false));
+            addTapGestures(el, () => { burstHearts(el); addReaction(snap.key, '❤️'); }, () => showMsgActions(snap.key, msg.type, false));
             addLongPress(el, () => showMsgActions(snap.key, msg.type, false));
             addSwipeReply(el, snap.key);
           }
@@ -1687,6 +1687,28 @@
         if (Date.now() - lastTouch < 600) return; // ignore ghost click after a touch
         register();
       });
+    }
+
+    // TikTok-style burst of floating hearts when a message is double-tapped.
+    function burstHearts(el) {
+      if (!el) return;
+      if (navigator.vibrate) navigator.vibrate(14);
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      for (let i = 0; i < 6; i++) {
+        const h = document.createElement('div');
+        h.className = 'heart-float';
+        h.textContent = '❤️';
+        h.style.left = cx + 'px';
+        h.style.top = cy + 'px';
+        h.style.setProperty('--dx', ((Math.random() - 0.5) * 90).toFixed(0) + 'px');
+        h.style.setProperty('--rot', ((Math.random() - 0.5) * 50).toFixed(0) + 'deg');
+        h.style.setProperty('--sc', (0.7 + Math.random() * 0.7).toFixed(2));
+        h.style.animationDelay = Math.round(Math.random() * 130) + 'ms';
+        document.body.appendChild(h);
+        setTimeout(() => h.remove(), 1300);
+      }
     }
 
     let currentReactionKey = null;
