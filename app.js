@@ -356,6 +356,8 @@
         if (distFromBottom <= 150) btn.classList.remove('has-new');
       });
 
+      setupChatExitSwipe();
+
       currentWallpaper = null;
       area.style.backgroundImage = '';
       area.classList.remove('has-wallpaper-img');
@@ -1327,6 +1329,41 @@
     /* ==========================================================
        SCROLL
     ========================================================== */
+    // Swipe the chat right-to-left (leftward) to leave it — Saud only. Binds
+    // once; triggers when the swipe starts from the right edge or on empty
+    // chat space, so it never clashes with per-message swipe-to-reply.
+    function setupChatExitSwipe() {
+      const area = $('messages-area');
+      if (!area || area._exitSwipeBound) return;
+      area._exitSwipeBound = true;
+      let sx = 0, sy = 0, tracking = false;
+      area.addEventListener('touchstart', (e) => {
+        if (currentUser !== 'saud' || e.touches.length !== 1) { tracking = false; return; }
+        const t = e.touches[0];
+        sx = t.clientX; sy = t.clientY;
+        const fromEdge = (window.innerWidth - sx) <= 44;
+        const onMessage = e.target.closest && e.target.closest('.message');
+        tracking = fromEdge || !onMessage;
+      }, { passive: true });
+      area.addEventListener('touchmove', (e) => {
+        if (!tracking) return;
+        const t = e.touches[0];
+        if (Math.abs(t.clientY - sy) > Math.abs(t.clientX - sx)) tracking = false; // vertical scroll
+      }, { passive: true });
+      const finish = (e) => {
+        if (!tracking) return;
+        tracking = false;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - sx, dy = t.clientY - sy;
+        if (dx <= -70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          if (navigator.vibrate) navigator.vibrate(10);
+          navigate('/');
+        }
+      };
+      area.addEventListener('touchend', finish);
+      area.addEventListener('touchcancel', () => { tracking = false; });
+    }
+
     // Flag the scroll-to-bottom button when a new message arrives while the
     // reader is scrolled up, so they can jump down without being yanked there.
     function showNewMsgPill() {
