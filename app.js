@@ -659,8 +659,45 @@
     }
 
     /* ==========================================================
-       MEDIA UPLOAD
+       MEDIA UPLOAD  (Cloudinary — media stored as URL, not base64)
     ========================================================== */
+    const CLOUDINARY_CLOUD = 'dbazaqizq';
+    const CLOUDINARY_PRESET = 'Chattttt';
+
+    async function uploadToCloudinary(input, onProgress) {
+      let blob;
+      if (typeof input === 'string') {
+        const res = await fetch(input);
+        blob = await res.blob();
+      } else {
+        blob = input;
+      }
+      const form = new FormData();
+      form.append('file', blob);
+      form.append('upload_preset', CLOUDINARY_PRESET);
+      const endpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`;
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', endpoint);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const r = JSON.parse(xhr.responseText);
+              if (r.secure_url) resolve(r.secure_url);
+              else reject(new Error('no url in response'));
+            } catch (err) { reject(err); }
+          } else {
+            reject(new Error('Cloudinary upload failed: ' + xhr.status));
+          }
+        };
+        xhr.onerror = () => reject(new Error('network error'));
+        xhr.send(form);
+      });
+    }
+
     async function uploadAndSend() {
       if (!pendingFile) return;
 
@@ -678,33 +715,35 @@
       clearPendingMedia();
 
       try {
-        let dataUrl;
+        let source;
         if (isImage && !file.type.includes('gif')) {
-          fill.style.width = '50%';
+          fill.style.width = '30%';
           text.textContent = 'جاري الضغط...';
-          dataUrl = await compressImageToDataUrl(file);
+          source = await compressImageToDataUrl(file);
         } else if (!isImage) {
           if (file.size > 50 * 1024 * 1024) {
             overlay.style.display = 'none';
             alert('الملف كبير جداً. الحد الأقصى ٥٠ ميغابايت.');
             return;
           }
-          fill.style.width = '40%';
+          fill.style.width = '15%';
           text.textContent = 'جاري ضغط الفيديو...';
-          dataUrl = await compressVideoToDataUrl(file, (p) => {
-            fill.style.width = (40 + p * 40) + '%';
+          source = await compressVideoToDataUrl(file, (p) => {
+            fill.style.width = (15 + p * 35) + '%';
           });
         } else {
-          dataUrl = await fileToDataUrl(file);
+          source = file;
         }
 
-        fill.style.width = '80%';
-        text.textContent = 'جاري الإرسال...';
+        text.textContent = 'جاري الرفع...';
+        const url = await uploadToCloudinary(source, (p) => {
+          fill.style.width = (55 + p * 43) + '%';
+        });
 
         const mediaMsg = {
           sender: currentUser,
           type: type,
-          content: dataUrl,
+          content: url,
           timestamp: firebase.database.ServerValue.TIMESTAMP
         };
         if (replyToKey && replyToMsg) {
@@ -830,11 +869,11 @@
           alert('التسجيل كبير جداً. حاول تسجيلاً أقصر.');
           return;
         }
-        const dataUrl = await fileToDataUrl(blob);
+        const url = await uploadToCloudinary(blob);
         const msg = {
           sender: currentUser,
           type: 'audio',
-          content: dataUrl,
+          content: url,
           duration: duration,
           timestamp: firebase.database.ServerValue.TIMESTAMP
         };
