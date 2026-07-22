@@ -1797,10 +1797,15 @@
     }
 
     /* ==========================================================
-       GIF PICKER  (Trending suggestions + search, GIPHY)
+       STICKER & GIF PICKER
+       - "ستيكراتي": custom shared sticker pack (Cloudinary + Firebase),
+         for Arabic content (حسن البارقي، طاش ما طاش، …)
+       - "GIF": Tenor search (better Arabic coverage) with GIPHY fallback
     ========================================================== */
     const GIPHY_KEY = 'YKbmWpQqVRfRU3vt8j0IVzONuKKNyKSj'; // GIPHY API key
+    const TENOR_KEY = 'YOUR_TENOR_KEY'; // Google Cloud key with Tenor API enabled
     let gifSearchTimer = null;
+    let gifTab = 'stickers';
 
     function openGifPicker() {
       if (document.getElementById('gif-overlay')) return;
@@ -1810,12 +1815,16 @@
       overlay.onclick = (e) => { if (e.target === overlay) closeGifPicker(); };
       overlay.innerHTML = `
         <div class="gif-panel" onclick="event.stopPropagation()">
-          <div class="gif-search-row">
-            <input type="text" id="gif-search-input" class="gif-search-input" placeholder="ابحث عن GIF…" dir="auto" autocomplete="off">
+          <div class="gif-tabs">
+            <button class="gif-tab" data-tab="stickers" onclick="switchGifTab('stickers')">ستيكراتي</button>
+            <button class="gif-tab" data-tab="gif" onclick="switchGifTab('gif')">GIF</button>
             <button class="gif-close" onclick="closeGifPicker()" aria-label="إغلاق">✕</button>
           </div>
+          <div class="gif-search-row" id="gif-search-row" style="display:none">
+            <input type="text" id="gif-search-input" class="gif-search-input" placeholder="ابحث عن GIF…" dir="auto" autocomplete="off">
+          </div>
           <div class="gif-grid" id="gif-grid"></div>
-          <div class="gif-attribution">مدعوم من GIPHY</div>
+          <div class="gif-attribution" id="gif-attribution"></div>
         </div>`;
       document.body.appendChild(overlay);
       const inp = document.getElementById('gif-search-input');
@@ -1824,8 +1833,27 @@
         const q = inp.value.trim();
         gifSearchTimer = setTimeout(() => loadGifs(q), 350);
       });
-      loadGifs(''); // trending suggestions on open
-      setTimeout(() => inp.focus(), 80);
+      switchGifTab(gifTab);
+    }
+
+    function switchGifTab(tab) {
+      gifTab = tab;
+      clearTimeout(gifSearchTimer);
+      document.querySelectorAll('.gif-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      const searchRow = document.getElementById('gif-search-row');
+      const attr = document.getElementById('gif-attribution');
+      const useTenor = TENOR_KEY && TENOR_KEY !== 'YOUR_TENOR_KEY';
+      if (tab === 'stickers') {
+        if (searchRow) searchRow.style.display = 'none';
+        if (attr) attr.textContent = '';
+        loadStickers();
+      } else {
+        if (searchRow) searchRow.style.display = 'flex';
+        if (attr) attr.textContent = useTenor ? 'مدعوم من Tenor' : 'مدعوم من GIPHY';
+        const inp = document.getElementById('gif-search-input');
+        if (inp) { loadGifs(inp.value.trim()); setTimeout(() => inp.focus(), 80); }
+        else loadGifs('');
+      }
     }
 
     function closeGifPicker() {
@@ -1834,42 +1862,108 @@
       if (o) o.remove();
     }
 
+    /* ---- Custom stickers: a shared pack stored in Firebase ---- */
+    function loadStickers() {
+      const grid = document.getElementById('gif-grid');
+      if (!grid || !db) return;
+      grid.innerHTML = '<div class="gif-status">جاري التحميل…</div>';
+      db.ref('stickers').once('value', snap => {
+        if (gifTab !== 'stickers') return;
+        grid.innerHTML = '';
+        const add = document.createElement('button');
+        add.className = 'gif-cell sticker-add';
+        add.innerHTML = '<span>➕<br>إضافة</span>';
+        add.onclick = pickStickerFile;
+        grid.appendChild(add);
+        const items = [];
+        snap.forEach(ch => {
+          const v = ch.val() || {};
+          if (v.url) items.push({ key: ch.key, url: v.url, type: v.type || 'gif', timestamp: v.timestamp || 0 });
+        });
+        items.sort((a, b) => b.timestamp - a.timestamp);
+        items.forEach(s => {
+          const cell = document.createElement('div');
+          cell.className = 'gif-cell sticker-cell';
+          cell.innerHTML = `<img src="${escapeAttr(s.url)}" alt="ستيكر" loading="lazy"><button class="sticker-del" aria-label="حذف">✕</button>`;
+          cell.querySelector('img').onclick = () => sendGif(s.url, s.type);
+          cell.querySelector('.sticker-del').onclick = (e) => { e.stopPropagation(); deleteSticker(s.key); };
+          grid.appendChild(cell);
+        });
+        if (!items.length) {
+          const hint = document.createElement('div');
+          hint.className = 'gif-status';
+          hint.textContent = 'ما فيه ستيكرات بعد — اضغط ➕ وأضف صور أو GIF (حسن البارقي، طاش…)';
+          grid.appendChild(hint);
+        }
+      });
+    }
+
+    function pickStickerFile() {
+      let input = document.getElementById('sticker-file-input');
+      if (!input) {
+        input = document.createElement('input');
+        input.type = 'file';
+        input.id = 'sticker-file-input';
+        input.accept = 'image/*';
+        input.style.display = 'none';
+        document.body.appendChild(input);
+      }
+      input.value = '';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) uploadSticker(file);
+      };
+      input.click();
+    }
+
+    async function uploadSticker(file) {
+      const grid = document.getElementById('gif-grid');
+      const isGif = file.type === 'image/gif';
+      if (grid) grid.insertAdjacentHTML('afterbegin', '<div class="gif-status" id="sticker-uploading">جاري رفع الستيكر…</div>');
+      try {
+        const url = await uploadToCloudinary(file);
+        await db.ref('stickers').push({
+          url,
+          type: isGif ? 'gif' : 'image',
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+        if (gifTab === 'stickers') loadStickers();
+      } catch (err) {
+        const up = document.getElementById('sticker-uploading');
+        if (up) up.textContent = 'تعذّر رفع الستيكر، حاول مرة أخرى';
+      }
+    }
+
+    function deleteSticker(key) {
+      if (!db || !key) return;
+      db.ref('stickers/' + key).remove().then(() => { if (gifTab === 'stickers') loadStickers(); });
+    }
+
+    /* ---- GIF search: Tenor (Arabic) with GIPHY fallback ---- */
     async function loadGifs(query) {
       const grid = document.getElementById('gif-grid');
       if (!grid) return;
       grid.innerHTML = '<div class="gif-status">جاري التحميل…</div>';
-      const url = query
-        ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13&lang=ar`
-        : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=pg-13`;
-      if (!GIPHY_KEY || GIPHY_KEY === 'YOUR_GIPHY_KEY') {
-        grid.innerHTML = '<div class="gif-status">يلزم مفتاح GIPHY لتفعيل الـ GIF</div>';
-        return;
-      }
+      const useTenor = TENOR_KEY && TENOR_KEY !== 'YOUR_TENOR_KEY';
       try {
-        const res = await fetch(url);
-        const data = await res.json();
-        const status = data && data.meta && data.meta.status;
-        if (status && status >= 400) {
-          grid.innerHTML = '<div class="gif-status">مفتاح GIPHY غير صالح أو تجاوز الحد</div>';
+        const results = useTenor ? await fetchTenor(query) : await fetchGiphy(query);
+        if (gifTab !== 'gif') return;
+        // Guard against a late response from a previous query.
+        if (document.getElementById('gif-search-input')?.value.trim() !== query) return;
+        if (results === null) {
+          grid.innerHTML = '<div class="gif-status">مفتاح غير صالح أو تجاوز الحد</div>';
           return;
         }
-        const items = (data && data.data) || [];
-        if (!items.length) {
+        if (!results.length) {
           grid.innerHTML = '<div class="gif-status">لا توجد نتائج</div>';
           return;
         }
-        // Guard against a late response from a previous query.
-        if (document.getElementById('gif-search-input')?.value.trim() !== query) return;
         grid.innerHTML = '';
-        items.forEach(g => {
-          const img = g.images || {};
-          const thumb = (img.fixed_width_downsampled || img.fixed_width || img.downsized || {}).url;
-          const full = (img.downsized_medium || img.original || img.fixed_width || {}).url;
-          if (!thumb || !full) return;
+        results.forEach(r => {
           const cell = document.createElement('button');
           cell.className = 'gif-cell';
-          cell.innerHTML = `<img src="${escapeAttr(thumb)}" alt="GIF" loading="lazy">`;
-          cell.onclick = () => sendGif(full);
+          cell.innerHTML = `<img src="${escapeAttr(r.thumb)}" alt="GIF" loading="lazy">`;
+          cell.onclick = () => sendGif(r.full, 'gif');
           grid.appendChild(cell);
         });
       } catch (e) {
@@ -1877,11 +1971,43 @@
       }
     }
 
-    function sendGif(url) {
+    async function fetchGiphy(query) {
+      const url = query
+        ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13&lang=ar`
+        : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=pg-13`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const status = data && data.meta && data.meta.status;
+      if (status && status >= 400) return null;
+      return ((data && data.data) || []).map(g => {
+        const img = g.images || {};
+        const thumb = (img.fixed_width_downsampled || img.fixed_width || img.downsized || {}).url;
+        const full = (img.downsized_medium || img.original || img.fixed_width || {}).url;
+        return (thumb && full) ? { thumb, full } : null;
+      }).filter(Boolean);
+    }
+
+    async function fetchTenor(query) {
+      const base = query
+        ? `https://tenor.googleapis.com/v2/search?key=${TENOR_KEY}&q=${encodeURIComponent(query)}&limit=24&locale=ar_SA&media_filter=tinygif,gif&contentfilter=medium`
+        : `https://tenor.googleapis.com/v2/featured?key=${TENOR_KEY}&limit=24&locale=ar_SA&media_filter=tinygif,gif&contentfilter=medium`;
+      const res = await fetch(base);
+      if (res.status === 401 || res.status === 403) return null;
+      const data = await res.json();
+      return ((data && data.results) || []).map(r => {
+        const mf = r.media_formats || {};
+        const thumb = (mf.tinygif || mf.nanogif || mf.gif || {}).url;
+        const full = (mf.gif || mf.mediumgif || mf.tinygif || {}).url;
+        return (thumb && full) ? { thumb, full } : null;
+      }).filter(Boolean);
+    }
+
+    function sendGif(url, type) {
       if (!currentChatId || !currentUser || !db) return;
+      type = type || 'gif';
       const msgData = {
         sender: currentUser,
-        type: 'gif',
+        type: type,
         content: url,
         timestamp: firebase.database.ServerValue.TIMESTAMP
       };
@@ -1894,7 +2020,7 @@
         };
       }
       db.ref(`chats/${currentChatId}/messages`).push(msgData);
-      sendPush(currentChatId, '🎞️ GIF');
+      sendPush(currentChatId, type === 'image' ? '😄 ستيكر' : '🎞️ GIF');
       cancelReply();
       closeGifPicker();
     }

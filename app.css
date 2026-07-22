@@ -872,6 +872,14 @@
       display: flex; flex-direction: column;
       max-height: 70vh; animation: slideUp 0.2s ease-out;
     }
+    .gif-tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    .gif-tab {
+      background: none; border: none; cursor: pointer; font-family: inherit;
+      font-size: 14px; font-weight: 700; color: var(--muted);
+      padding: 6px 12px; border-radius: 16px; transition: background 0.2s, color 0.2s;
+    }
+    .gif-tab.active { background: var(--accent); color: #fff; }
+    .gif-tabs .gif-close { margin-inline-start: auto; }
     .gif-search-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
     .gif-search-input {
       flex: 1; border: 1px solid var(--border); border-radius: 22px;
@@ -901,7 +909,21 @@
     }
     .gif-attribution {
       text-align: center; color: var(--muted); font-size: 10px;
-      margin-top: 8px; opacity: 0.7;
+      margin-top: 8px; opacity: 0.7; min-height: 12px;
+    }
+    .sticker-add {
+      display: flex; align-items: center; justify-content: center;
+      aspect-ratio: 1 / 1; background: var(--accent); color: #fff;
+      font-weight: 700; font-size: 13px; text-align: center; line-height: 1.3;
+    }
+    .sticker-add span { display: block; }
+    .sticker-cell { position: relative; }
+    .sticker-cell img { cursor: pointer; }
+    .sticker-del {
+      position: absolute; top: 5px; inset-inline-end: 5px;
+      width: 22px; height: 22px; border-radius: 50%; border: none; cursor: pointer;
+      background: rgba(0,0,0,0.55); color: #fff; font-size: 12px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
     }
     :root[data-theme="dark"] .gif-panel { background: var(--header-bg); }
     :root[data-theme="dark"] .gif-search-input { background: #2a3942; color: #e9edef; border-color: var(--border); }
