@@ -71,6 +71,8 @@
     let mediaRecorder = null;
     let recChunks = [];
     let recStream = null;
+    let micStream = null;
+    let micReleaseTimer = null;
     let recTimer = null;
     let recSeconds = 0;
     let recShouldSend = false;
@@ -182,6 +184,7 @@
       activeListeners = [];
       clearPendingMedia();
       if (mediaRecorder) stopRecording(false);
+      releaseMic();
       if (currentAudioEl) { currentAudioEl.pause(); resetAudioBtn(currentAudioBtn); currentAudioEl = null; currentAudioBtn = null; }
       currentChatId = null;
       currentUser = null;
@@ -826,27 +829,13 @@
         alert('التسجيل الصوتي غير مدعوم على هذا المتصفح.');
         return;
       }
+      clearTimeout(micReleaseTimer);
       let stream;
-      // Capture raw, full-band audio. The browser's voice pipeline (echo
-      // cancellation / noise suppression / auto gain) band-limits the signal
-      // and makes voice notes sound muffled, so all of it is turned off.
-      const audioConstraints = {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-        channelCount: 1,
-        sampleRate: 48000
-      };
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
-      } catch (e) {
-        // Fall back to plain audio if the device rejects the constraints
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (e2) {
-          alert('تعذّر الوصول للميكروفون. تأكد من السماح بالإذن.');
-          return;
-        }
+        stream = await getMicStream();
+      } catch (e2) {
+        alert('تعذّر الوصول للميكروفون. تأكد من السماح بالإذن.');
+        return;
       }
       recStream = stream;
       recChunks = [];
@@ -890,8 +879,47 @@
       if (navigator.vibrate) navigator.vibrate(15);
     }
 
+    // Keep one granted microphone stream alive for the session and reuse it,
+    // so the browser doesn't re-prompt for permission on every voice note.
+    // It's released when leaving the chat, backgrounding, or after idle.
+    async function getMicStream() {
+      if (micStream && micStream.getAudioTracks().some(t => t.readyState === 'live')) {
+        return micStream;
+      }
+      micStream = null;
+      // Capture raw, full-band audio. The browser's voice pipeline (echo
+      // cancellation / noise suppression / auto gain) band-limits the signal
+      // and makes voice notes sound muffled, so all of it is turned off.
+      const audioConstraints = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: 1,
+        sampleRate: 48000
+      };
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      } catch (e) {
+        // Fall back to plain audio if the device rejects the constraints
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      return micStream;
+    }
+
+    function scheduleMicRelease(delay) {
+      clearTimeout(micReleaseTimer);
+      micReleaseTimer = setTimeout(releaseMic, delay || 90000);
+    }
+
+    function releaseMic() {
+      clearTimeout(micReleaseTimer);
+      if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+      recStream = null;
+    }
+
+    // On a hard error we drop the mic entirely.
     function stopStream() {
-      if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+      releaseMic();
     }
 
     function stopRecording(send) {
@@ -900,7 +928,9 @@
       recFinalDuration = recSeconds;
       if (recTimer) { clearInterval(recTimer); recTimer = null; }
       try { mediaRecorder.stop(); } catch (e) {}
-      stopStream();
+      // Keep the mic stream alive briefly so back-to-back voice notes don't
+      // trigger a fresh permission prompt; release it after a short idle.
+      scheduleMicRelease();
       const rb = $('record-bar');
       if (rb) rb.style.display = 'none';
       const inputArea = $('input-area');
@@ -2226,5 +2256,7 @@
     // sender's tick flips to double without waiting for a new message.
     document.addEventListener('visibilitychange', function() {
       if (!document.hidden) markSeen();
+      else releaseMic(); // free the mic (and its indicator) when backgrounded
     });
     window.addEventListener('focus', markSeen);
+    window.addEventListener('pagehide', releaseMic);
