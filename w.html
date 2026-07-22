@@ -1462,12 +1462,18 @@
           fill.style.width = '50%';
           text.textContent = 'جاري الضغط...';
           dataUrl = await compressImageToDataUrl(file);
-        } else {
-          if (file.size > 20 * 1024 * 1024) {
+        } else if (!isImage) {
+          if (file.size > 50 * 1024 * 1024) {
             overlay.style.display = 'none';
-            alert('الملف كبير جداً. الحد الأقصى ٢٠ ميغابايت للفيديو.');
+            alert('الملف كبير جداً. الحد الأقصى ٥٠ ميغابايت.');
             return;
           }
+          fill.style.width = '40%';
+          text.textContent = 'جاري ضغط الفيديو...';
+          dataUrl = await compressVideoToDataUrl(file, (p) => {
+            fill.style.width = (40 + p * 40) + '%';
+          });
+        } else {
           dataUrl = await fileToDataUrl(file);
         }
 
@@ -1529,6 +1535,87 @@
           fileToDataUrl(file).then(resolve).catch(reject);
         };
         img.src = URL.createObjectURL(file);
+      });
+    }
+
+    function compressVideoToDataUrl(file, onProgress) {
+      return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        video.muted = true;
+        video.playsInline = true;
+        video.preload = 'auto';
+
+        video.onloadedmetadata = () => {
+          let w = video.videoWidth, h = video.videoHeight;
+          const maxDim = 640;
+          if (w > maxDim || h > maxDim) {
+            if (w >= h) { h = Math.round((maxDim / w) * h); w = maxDim; }
+            else { w = Math.round((maxDim / h) * w); h = maxDim; }
+          }
+          w = w % 2 === 0 ? w : w - 1;
+          h = h % 2 === 0 ? h : h - 1;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+
+          const stream = canvas.captureStream(24);
+          try {
+            const audioCtx2 = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioCtx2.createMediaElementSource(video);
+            const dest = audioCtx2.createMediaStreamDestination();
+            source.connect(dest);
+            dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+          } catch(e) {}
+
+          let mimeType = 'video/webm;codecs=vp8';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+              mimeType = 'video/mp4';
+              if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
+            }
+          }
+
+          const recorder = new MediaRecorder(stream, {
+            mimeType: mimeType || undefined,
+            videoBitsPerSecond: 600000
+          });
+          const chunks = [];
+          recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+          recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: recorder.mimeType });
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          };
+          recorder.onerror = () => {
+            fileToDataUrl(file).then(resolve).catch(reject);
+          };
+
+          recorder.start(100);
+          video.play();
+
+          const duration = video.duration || 60;
+          const drawFrame = () => {
+            if (video.ended || video.paused) {
+              try { recorder.stop(); } catch(e) {}
+              return;
+            }
+            ctx.drawImage(video, 0, 0, w, h);
+            if (onProgress) onProgress(Math.min(video.currentTime / duration, 1));
+            requestAnimationFrame(drawFrame);
+          };
+          drawFrame();
+          video.onended = () => { try { recorder.stop(); } catch(e) {} };
+        };
+
+        video.onerror = () => {
+          fileToDataUrl(file).then(resolve).catch(reject);
+        };
+        video.src = URL.createObjectURL(file);
       });
     }
 
