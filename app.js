@@ -823,11 +823,23 @@
         return;
       }
       let stream;
+      const audioConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1,
+        sampleRate: 48000
+      };
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
       } catch (e) {
-        alert('تعذّر الوصول للميكروفون. تأكد من السماح بالإذن.');
-        return;
+        // Fall back to plain audio if the device rejects the constraints
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e2) {
+          alert('تعذّر الوصول للميكروفون. تأكد من السماح بالإذن.');
+          return;
+        }
       }
       recStream = stream;
       recChunks = [];
@@ -836,13 +848,17 @@
       recFinalDuration = 0;
 
       let mime = '';
-      const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
+      const candidates = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac'];
       for (const c of candidates) {
         try { if (MediaRecorder.isTypeSupported(c)) { mime = c; break; } } catch (e) {}
       }
+      // Opus is efficient — 64kbps is transparent for speech. Lossy AAC/mp4
+      // (iOS Safari) needs more headroom to sound clean, so give it 128kbps.
+      const isOpus = /opus/i.test(mime);
+      const audioBitrate = isOpus ? 64000 : 128000;
       try {
         mediaRecorder = mime
-          ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 32000 })
+          ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: audioBitrate })
           : new MediaRecorder(stream);
       } catch (e) {
         try { mediaRecorder = new MediaRecorder(stream); }
