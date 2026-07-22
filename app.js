@@ -823,12 +823,13 @@
         return;
       }
       let stream;
-      // Noise suppression is a browser on/off toggle and tends to make voice
-      // sound muffled, so it's disabled here for a cleaner, more natural sound.
+      // Capture raw, full-band audio. The browser's voice pipeline (echo
+      // cancellation / noise suppression / auto gain) band-limits the signal
+      // and makes voice notes sound muffled, so all of it is turned off.
       const audioConstraints = {
-        echoCancellation: true,
+        echoCancellation: false,
         noiseSuppression: false,
-        autoGainControl: true,
+        autoGainControl: false,
         channelCount: 1,
         sampleRate: 48000
       };
