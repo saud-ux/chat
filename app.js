@@ -991,20 +991,48 @@
       }
     }
 
+    // Playback speed, shared across all voice notes and remembered.
+    let audioSpeed = parseFloat(localStorage.getItem('audioSpeed')) || 1;
+
+    // Build a stable "waveform" of bars from the clip's URL so every note has
+    // its own varied shape instead of a flat line.
+    function waveBarsHtml(seed, n) {
+      let h = 2166136261;
+      for (let i = 0; i < seed.length; i++) { h = (h ^ seed.charCodeAt(i)) >>> 0; h = (h * 16777619) >>> 0; }
+      let bars = '';
+      for (let i = 0; i < n; i++) {
+        h = (h * 1103515245 + 12345) >>> 0;
+        const height = 22 + (h % 78); // 22%..100%
+        bars += `<span class="audio-bar" style="height:${height}%"></span>`;
+      }
+      return bars;
+    }
+
+    function paintWavePlayed(wrap, ratio) {
+      const bars = wrap.querySelectorAll('.audio-bar');
+      const played = Math.round(ratio * bars.length);
+      bars.forEach((b, i) => b.classList.toggle('played', i < played));
+    }
+
+    function cycleAudioSpeed(btn) {
+      const steps = [1, 1.5, 2];
+      audioSpeed = steps[(steps.indexOf(audioSpeed) + 1) % steps.length];
+      localStorage.setItem('audioSpeed', audioSpeed);
+      document.querySelectorAll('.audio-speed').forEach(b => { b.textContent = audioSpeed + 'x'; });
+      if (currentAudioEl) currentAudioEl.playbackRate = audioSpeed;
+      if (navigator.vibrate) navigator.vibrate(8);
+    }
+
     function resetAudioBtn(btn) {
       if (!btn) return;
       btn.textContent = '▶';
       const wrap = btn.closest('.msg-audio');
-      if (wrap) {
-        const p = wrap.querySelector('.audio-progress');
-        if (p) p.style.width = '0%';
-      }
+      if (wrap) wrap.querySelectorAll('.audio-bar.played').forEach(b => b.classList.remove('played'));
     }
 
     function toggleAudioPlay(btn) {
       const wrap = btn.closest('.msg-audio');
       if (!wrap) return;
-      const progress = wrap.querySelector('.audio-progress');
       const storedDur = parseFloat(wrap.getAttribute('data-dur')) || 0;
 
       if (currentAudioBtn === btn && currentAudioEl) {
@@ -1021,15 +1049,16 @@
       }
 
       const audio = new Audio(wrap.getAttribute('data-audio'));
+      audio.playbackRate = audioSpeed;
       currentAudioEl = audio;
       currentAudioBtn = btn;
 
-      audio.onplay = () => { btn.textContent = '⏸'; };
+      audio.onplay = () => { btn.textContent = '⏸'; audio.playbackRate = audioSpeed; };
       audio.onpause = () => { if (currentAudioBtn === btn) btn.textContent = '▶'; };
-      audio.onended = () => { btn.textContent = '▶'; if (progress) progress.style.width = '0%'; };
+      audio.onended = () => { btn.textContent = '▶'; paintWavePlayed(wrap, 0); };
       audio.ontimeupdate = () => {
         const d = (audio.duration && isFinite(audio.duration)) ? audio.duration : storedDur;
-        if (d && progress) progress.style.width = Math.min(100, (audio.currentTime / d) * 100) + '%';
+        if (d) paintWavePlayed(wrap, Math.min(1, audio.currentTime / d));
       };
       audio.play().catch(() => {});
     }
@@ -1331,7 +1360,7 @@
       } else if (msg.type === 'video') {
         content = `<video class="msg-video" src="${escapeAttr(msg.content)}" controls playsinline preload="metadata"></video>`;
       } else if (msg.type === 'audio') {
-        content = `<div class="msg-audio" data-audio="${escapeAttr(msg.content)}" data-dur="${msg.duration || 0}"><button class="audio-play" onclick="toggleAudioPlay(this)">▶</button><div class="audio-body"><div class="audio-wave" onclick="seekAudio(event, this)"><div class="audio-progress"></div></div><span class="audio-dur">${formatDur(msg.duration || 0)}</span></div></div>`;
+        content = `<div class="msg-audio" data-audio="${escapeAttr(msg.content)}" data-dur="${msg.duration || 0}"><button class="audio-play" onclick="toggleAudioPlay(this)">▶</button><div class="audio-body"><div class="audio-wave" onclick="seekAudio(event, this)">${waveBarsHtml(msg.content, 34)}</div><span class="audio-dur">${formatDur(msg.duration || 0)}</span></div><button class="audio-speed" onclick="cycleAudioSpeed(this)">${audioSpeed}x</button></div>`;
       } else {
         content = `<div class="msg-text">${escapeHtml(msg.content)}</div>`;
       }
