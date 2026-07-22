@@ -823,9 +823,11 @@
         return;
       }
       let stream;
+      // Noise suppression is a browser on/off toggle and tends to make voice
+      // sound muffled, so it's disabled here for a cleaner, more natural sound.
       const audioConstraints = {
         echoCancellation: true,
-        noiseSuppression: true,
+        noiseSuppression: false,
         autoGainControl: true,
         channelCount: 1,
         sampleRate: 48000
