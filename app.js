@@ -868,6 +868,7 @@
         db.ref(`chats/${currentChatId}/messages`).push(msgData);
         sendPush(currentChatId, text.length > 50 ? text.substring(0, 50) + '...' : text);
         cancelReply();
+        haptic(10);
       }
 
       clearTyping();
@@ -1676,7 +1677,8 @@
       }
       const editedTag = msg.edited ? '<span class="msg-edited">(معدّلة)</span>' : '';
       const statusHtml = isMine ? `<span class="msg-status">${TICK_SINGLE}</span>` : '';
-      el.innerHTML = replyHtml + content + reactionsHtml + `<div class="msg-time">${editedTag}${formatTime(msg.timestamp)}${statusHtml}</div>`;
+      const savedTag = (el.dataset.key && isSaved(el.dataset.key)) ? '<span class="msg-saved-star">⭐</span>' : '';
+      el.innerHTML = replyHtml + content + reactionsHtml + `<div class="msg-time">${savedTag}${editedTag}${formatTime(msg.timestamp)}${statusHtml}</div>`;
     }
 
     /* ==========================================================
@@ -1745,10 +1747,15 @@
       if (msgType === 'gif' || msgType === 'image') {
         html += `<button class="msg-action-btn" onclick="saveAsSticker('${key}')">⭐ حفظ كستيكر</button>`;
       }
+      if (msgType !== 'game') {
+        const saved = isSaved(key);
+        html += `<button class="msg-action-btn" onclick="toggleSaveMessage('${key}')">${saved ? '★ إزالة من المحفوظة' : '⭐ حفظ الرسالة'}</button>`;
+      }
       html += `<button class="msg-action-btn danger" onclick="deleteMessage('${key}')">🗑️ حذف</button>`;
       html += `<button class="msg-action-btn msg-action-cancel" onclick="hideMsgActions()">إلغاء</button>`;
       $('msg-actions-content').innerHTML = html;
       $('msg-actions-overlay').style.display = 'flex';
+      haptic(12);
     }
 
     function hideMsgActions() {
@@ -1798,6 +1805,129 @@
       t.textContent = text;
       document.body.appendChild(t);
       setTimeout(() => { t.classList.add('hide'); setTimeout(() => t.remove(), 260); }, 1300);
+    }
+
+    // Light haptic tap (no-op on devices/browsers without the Vibration API).
+    function haptic(ms) {
+      if (navigator.vibrate) { try { navigator.vibrate(ms || 10); } catch (e) {} }
+    }
+
+    /* ==========================================================
+       SAVED / STARRED MESSAGES (personal, stored per user)
+    ========================================================== */
+    function savedKey() { return 'saved_' + (currentUser || 'x'); }
+    function getSaved() {
+      try { return JSON.parse(localStorage.getItem(savedKey()) || '[]'); }
+      catch (e) { return []; }
+    }
+    function setSaved(arr) {
+      try { localStorage.setItem(savedKey(), JSON.stringify(arr)); } catch (e) {}
+    }
+    function isSaved(key) {
+      return getSaved().some(s => s.chatId === currentChatId && s.key === key);
+    }
+
+    function toggleSaveMessage(key) {
+      hideMsgActions();
+      const arr = getSaved();
+      const idx = arr.findIndex(s => s.chatId === currentChatId && s.key === key);
+      if (idx !== -1) {
+        arr.splice(idx, 1);
+        setSaved(arr);
+        miniToast('أُزيلت من المحفوظة');
+      } else {
+        const entry = allMsgElements.find(m => m.key === key);
+        if (!entry) return;
+        const msg = entry.msg;
+        arr.push({
+          chatId: currentChatId, key,
+          sender: msg.sender, type: msg.type,
+          content: msg.content || '', duration: msg.duration || 0,
+          timestamp: msg.timestamp || Date.now(), savedAt: Date.now()
+        });
+        setSaved(arr);
+        haptic(12);
+        miniToast('حُفظت ⭐');
+      }
+      // Re-render just this message so the ⭐ badge appears/disappears live.
+      const entry = allMsgElements.find(m => m.key === key);
+      const el = document.querySelector(`[data-key="${key}"]`);
+      if (entry && el) renderMsgContent(el, entry.msg, entry.msg.sender === currentUser);
+    }
+
+    function savedPreview(s) {
+      if (s.type === 'image') return '📷 صورة';
+      if (s.type === 'gif') return '🎞️ GIF';
+      if (s.type === 'video') return '🎥 فيديو';
+      if (s.type === 'audio') return '🎤 رسالة صوتية';
+      if (s.type === 'game') return '🎮 لعبة';
+      const c = s.content || '';
+      return c.length > 80 ? c.substring(0, 80) + '…' : c;
+    }
+
+    function openSavedMessages() {
+      const old = document.getElementById('saved-overlay');
+      if (old) old.remove();
+      const settings = document.getElementById('settings-overlay');
+      if (settings) settings.remove();
+
+      // Newest-saved first.
+      const arr = getSaved().slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+      const nameOf = (id) => id === 'saud' ? 'سعود' : (CONTACTS[id] ? CONTACTS[id].name : id);
+
+      let items;
+      if (!arr.length) {
+        items = '<div class="saved-empty">لا توجد رسائل محفوظة بعد.<br>اضغط مطوّلاً على أي رسالة ثم «⭐ حفظ».</div>';
+      } else {
+        items = arr.map(s => {
+          const who = s.sender === currentUser ? 'أنت' : nameOf(s.sender);
+          return `<div class="saved-item" onclick="jumpToSaved('${escapeAttr(s.chatId)}','${escapeAttr(s.key)}')">
+            <div class="saved-item-body">
+              <div class="saved-item-meta">${escapeHtml(who)} · ${formatTime(s.timestamp)}</div>
+              <div class="saved-item-text">${escapeHtml(savedPreview(s))}</div>
+            </div>
+            <button class="saved-item-remove" onclick="event.stopPropagation();removeSaved('${escapeAttr(s.chatId)}','${escapeAttr(s.key)}',this)" aria-label="إزالة">✕</button>
+          </div>`;
+        }).join('');
+      }
+
+      const overlay = document.createElement('div');
+      overlay.id = 'saved-overlay';
+      overlay.className = 'settings-overlay';
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+      overlay.innerHTML = `<div class="settings-panel" onclick="event.stopPropagation()">
+        <div class="settings-title">الرسائل المحفوظة ⭐</div>
+        <div class="saved-list">${items}</div>
+        <button class="btn-settings-close" onclick="this.closest('.settings-overlay').remove()">إغلاق</button>
+      </div>`;
+      document.body.appendChild(overlay);
+    }
+
+    function removeSaved(chatId, key, btn) {
+      const arr = getSaved().filter(s => !(s.chatId === chatId && s.key === key));
+      setSaved(arr);
+      const row = btn && btn.closest('.saved-item');
+      if (row) row.remove();
+      // Refresh the ⭐ badge if that message is on screen in the current chat.
+      if (chatId === currentChatId) {
+        const entry = allMsgElements.find(m => m.key === key);
+        const el = document.querySelector(`[data-key="${key}"]`);
+        if (entry && el) renderMsgContent(el, entry.msg, entry.msg.sender === currentUser);
+      }
+      const list = document.querySelector('#saved-overlay .saved-list');
+      if (list && !arr.length) list.innerHTML = '<div class="saved-empty">لا توجد رسائل محفوظة بعد.</div>';
+    }
+
+    function jumpToSaved(chatId, key) {
+      const ov = document.getElementById('saved-overlay');
+      if (ov) ov.remove();
+      if (chatId === currentChatId) {
+        scrollToMessage(key);
+      } else {
+        const path = currentUser === 'saud' ? '/chat/' + chatId : '/' + chatId;
+        navigate(path);
+        setTimeout(() => scrollToMessage(key), 900);
+      }
     }
 
     /* ==========================================================
@@ -2583,6 +2713,7 @@
           db.ref(`chats/${currentChatId}/messages/${key}/reactions/${currentUser}`).remove();
         } else {
           db.ref(`chats/${currentChatId}/messages/${key}/reactions/${currentUser}`).set(emoji);
+          haptic(15);
           const entry = allMsgElements.find(m => m.key === key);
           if (entry && entry.msg.sender !== currentUser) {
             sendPush(currentChatId, `تفاعل على رسالتك ${emoji}`);
@@ -2598,6 +2729,7 @@
           db.ref(`chats/${currentChatId}/messages/${key}/reactions/${currentUser}`).remove();
         } else {
           db.ref(`chats/${currentChatId}/messages/${key}/reactions/${currentUser}`).set(emoji);
+          haptic(15);
           const entry = allMsgElements.find(m => m.key === key);
           if (entry && entry.msg.sender !== currentUser) {
             sendPush(currentChatId, `تفاعل على رسالتك ${emoji}`);
@@ -2924,6 +3056,7 @@
 
       overlay.innerHTML = `<div class="settings-panel" onclick="event.stopPropagation()">
         <div class="settings-title">الإعدادات</div>
+        <button class="btn-saved-open" onclick="openSavedMessages()">⭐ الرسائل المحفوظة</button>
         <div class="settings-row"><span>الوضع الداكن</span><button class="toggle-switch ${isDark ? 'active' : ''}" id="toggle-dark" onclick="toggleTheme();this.classList.toggle('active')"></button></div>
         <div class="settings-row" style="flex-direction:column;align-items:flex-start"><span>خلفية المحادثة</span>
           <div class="wallpaper-presets">
