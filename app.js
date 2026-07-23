@@ -387,7 +387,6 @@
           <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" aria-label="الوضع">${themeIcon}</button>
           <button class="btn-theme" onclick="openSettings()" aria-label="إعدادات">⚙️</button>
           <button class="btn-refresh" onclick="forceUpdate(this)" aria-label="تحديث">🔄</button>
-          ${isSaud ? `<button class="btn-theme" onclick="clearChat('${chatId}')" aria-label="حذف الكل">🗑️</button>` : ''}
         </div>`;
 
       const area = $('messages-area');
