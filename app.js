@@ -1734,32 +1734,51 @@
       el.addEventListener('touchcancel', finish);
     }
 
+    function actionBtn(icon, iconClass, label, onclick) {
+      return `<button class="msg-action-btn" onclick="${onclick}">
+        <span class="action-icon ${iconClass}">${icon}</span>
+        <span class="action-label">${label}</span>
+        <span class="action-chevron">‹</span>
+      </button>`;
+    }
+
     function showMsgActions(key, msgType, canEdit) {
-      let html = '';
-      html += `<button class="msg-action-btn" onclick="setReply('${key}')">↩️ رد</button>`;
-      html += `<button class="msg-action-btn" onclick="hideMsgActions();openReactionPicker('${key}')">😀 تفاعل</button>`;
+      let html = '<div class="msg-actions-handle"></div>';
+      html += actionBtn('↩️', 'reply-icon', 'رد', `setReply('${key}')`);
+      html += actionBtn('😀', 'react-icon', 'تفاعل', `hideMsgActions();openReactionPicker('${key}')`);
       if (msgType === 'text') {
-        html += `<button class="msg-action-btn" onclick="copyMessage('${key}')">📋 نسخ</button>`;
+        html += actionBtn('📋', 'copy-icon', 'نسخ', `copyMessage('${key}')`);
       }
       if (canEdit && msgType === 'text') {
-        html += `<button class="msg-action-btn" onclick="editMessage('${key}')">✏️ تعديل</button>`;
+        html += actionBtn('✏️', 'edit-icon', 'تعديل', `editMessage('${key}')`);
       }
       if (msgType === 'gif' || msgType === 'image') {
-        html += `<button class="msg-action-btn" onclick="saveAsSticker('${key}')">⭐ حفظ كستيكر</button>`;
+        html += actionBtn('⭐', 'sticker-icon', 'حفظ كستيكر', `saveAsSticker('${key}')`);
       }
       if (msgType !== 'game') {
         const saved = isSaved(key);
-        html += `<button class="msg-action-btn" onclick="toggleSaveMessage('${key}')">${saved ? '★ إزالة من المحفوظة' : '⭐ حفظ الرسالة'}</button>`;
+        html += actionBtn(saved ? '★' : '⭐', 'save-icon', saved ? 'إزالة من المحفوظة' : 'حفظ الرسالة', `toggleSaveMessage('${key}')`);
       }
-      html += `<button class="msg-action-btn danger" onclick="deleteMessage('${key}')">🗑️ حذف</button>`;
+      html += '<div class="msg-action-divider"></div>';
+      html += `<button class="msg-action-btn danger" onclick="deleteMessage('${key}')">
+        <span class="action-icon delete-icon">🗑️</span>
+        <span class="action-label">حذف</span>
+        <span class="action-chevron">‹</span>
+      </button>`;
       html += `<button class="msg-action-btn msg-action-cancel" onclick="hideMsgActions()">إلغاء</button>`;
       $('msg-actions-content').innerHTML = html;
-      $('msg-actions-overlay').style.display = 'flex';
+      const overlay = $('msg-actions-overlay');
+      overlay.style.display = 'flex';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => overlay.classList.add('visible'));
+      });
       haptic(12);
     }
 
     function hideMsgActions() {
-      $('msg-actions-overlay').style.display = 'none';
+      const overlay = $('msg-actions-overlay');
+      overlay.classList.remove('visible');
+      setTimeout(() => { overlay.style.display = 'none'; }, 350);
     }
 
     function deleteMessage(key) {
@@ -1935,14 +1954,18 @@
        Stored as a 'game' message so both players share live state.
     ========================================================== */
     function openGamePicker() {
-      let html = '';
-      html += `<button class="msg-action-btn" onclick="hideMsgActions();startXO()">⭕ إكس أو (XO)</button>`;
-      html += `<button class="msg-action-btn" onclick="hideMsgActions();startRPS()">✊✋✌️ حجرة ورقة مقص</button>`;
-      html += `<button class="msg-action-btn" onclick="hideMsgActions();startC4()">🔴 أربعة في خط</button>`;
-      html += `<button class="msg-action-btn" onclick="hideMsgActions();startGuess()">🔢 خمّن الرقم</button>`;
+      let html = '<div class="msg-actions-handle"></div>';
+      html += actionBtn('⭕', 'react-icon', 'إكس أو (XO)', `hideMsgActions();startXO()`);
+      html += actionBtn('✊✋✌️', 'react-icon', 'حجرة ورقة مقص', `hideMsgActions();startRPS()`);
+      html += actionBtn('🔴', 'react-icon', 'أربعة في خط', `hideMsgActions();startC4()`);
+      html += actionBtn('🔢', 'react-icon', 'خمّن الرقم', `hideMsgActions();startGuess()`);
       html += `<button class="msg-action-btn msg-action-cancel" onclick="hideMsgActions()">إلغاء</button>`;
       $('msg-actions-content').innerHTML = html;
-      $('msg-actions-overlay').style.display = 'flex';
+      const overlay = $('msg-actions-overlay');
+      overlay.style.display = 'flex';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => overlay.classList.add('visible'));
+      });
     }
 
     function gameOther() {

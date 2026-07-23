@@ -295,16 +295,44 @@
 
     /* ===== MESSAGE ACTIONS ===== */
     .msg-actions-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.01);
+      backdrop-filter: blur(0px);
+      -webkit-backdrop-filter: blur(0px);
       z-index: 998; display: flex; align-items: flex-end;
-      justify-content: center; animation: fadeIn 0.15s;
+      justify-content: center;
+      opacity: 0;
+      transition: background 0.3s ease, backdrop-filter 0.3s ease, -webkit-backdrop-filter 0.3s ease, opacity 0.05s;
+    }
+
+    .msg-actions-overlay.visible {
+      opacity: 1;
+      background: rgba(0,0,0,0.35);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
 
     .msg-actions {
-      background: #fff; border-radius: 16px 16px 0 0;
-      padding: 8px 0; width: 100%; max-width: 500px;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 20px 20px 0 0;
+      padding: 6px 0 0;
+      width: 100%; max-width: 500px;
       padding-bottom: calc(12px + var(--safe-bottom));
-      animation: slideUp 0.2s ease-out;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .msg-actions-overlay.visible .msg-actions {
+      transform: translateY(0);
+    }
+
+    .msg-actions-handle {
+      width: 36px; height: 4px;
+      background: rgba(0,0,0,0.18);
+      border-radius: 3px;
+      margin: 4px auto 8px;
     }
 
     @keyframes slideUp {
@@ -313,19 +341,56 @@
     }
 
     .msg-action-btn {
-      display: flex; align-items: center; gap: 10px;
-      width: 100%; padding: 14px 24px;
+      display: flex; align-items: center; gap: 14px;
+      width: 100%; padding: 13px 22px;
       border: none; background: none; font-size: 16px;
       text-align: right; cursor: pointer; font-family: inherit;
       color: #1a1a1a;
+      transition: background 0.15s ease;
+      position: relative;
     }
 
-    .msg-action-btn:active { background: #f5f5f5; }
-    .msg-action-btn.danger { color: #ef4444; }
+    .msg-action-btn .action-icon {
+      width: 38px; height: 38px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .msg-action-btn .action-icon.reply-icon { background: rgba(59,130,246,0.12); }
+    .msg-action-btn .action-icon.react-icon { background: rgba(251,191,36,0.14); }
+    .msg-action-btn .action-icon.copy-icon { background: rgba(16,185,129,0.12); }
+    .msg-action-btn .action-icon.edit-icon { background: rgba(139,92,246,0.12); }
+    .msg-action-btn .action-icon.sticker-icon { background: rgba(236,72,153,0.12); }
+    .msg-action-btn .action-icon.save-icon { background: rgba(245,158,11,0.12); }
+    .msg-action-btn .action-icon.delete-icon { background: rgba(239,68,68,0.10); }
+
+    .msg-action-btn .action-label {
+      flex: 1; font-weight: 500;
+    }
+
+    .msg-action-btn .action-chevron {
+      color: rgba(0,0,0,0.2);
+      font-size: 13px;
+      transition: transform 0.15s;
+    }
+
+    .msg-action-btn:active { background: rgba(0,0,0,0.05); }
+    .msg-action-btn:active .action-chevron { transform: translateX(-3px); }
+    .msg-action-btn.danger .action-label { color: #ef4444; }
+
+    .msg-action-divider {
+      height: 1px;
+      background: rgba(0,0,0,0.08);
+      margin: 4px 20px;
+    }
 
     .msg-action-cancel {
-      border-top: 1px solid var(--border);
+      border-top: 1px solid rgba(0,0,0,0.08);
+      margin-top: 4px;
       color: var(--muted); justify-content: center;
+      font-weight: 500;
     }
 
     .msg-deleted {
@@ -706,19 +771,28 @@
     :root[data-theme="dark"] .home-title,
     :root[data-theme="dark"] .pin-title,
     :root[data-theme="dark"] .setup-msg h2 { color: #e9edef; }
-    :root[data-theme="dark"] .chat-card:active,
-    :root[data-theme="dark"] .msg-action-btn:active { background: #2a3942; }
+    :root[data-theme="dark"] .chat-card:active { background: #2a3942; }
+    :root[data-theme="dark"] .msg-action-btn:active { background: rgba(255,255,255,0.08); }
     :root[data-theme="dark"] .msg-input,
     :root[data-theme="dark"] .search-input { background: #2a3942; color: #e9edef; border-color: var(--border); }
     :root[data-theme="dark"] .input-area,
     :root[data-theme="dark"] .record-bar,
     :root[data-theme="dark"] .media-preview-bar,
     :root[data-theme="dark"] .toast,
-    :root[data-theme="dark"] .msg-actions,
     :root[data-theme="dark"] .upload-box,
     :root[data-theme="dark"] .settings-panel,
     :root[data-theme="dark"] .search-bar { background: var(--header-bg); }
+    :root[data-theme="dark"] .msg-actions {
+      background: rgba(32,44,51,0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    :root[data-theme="dark"] .msg-actions-handle { background: rgba(255,255,255,0.2); }
     :root[data-theme="dark"] .msg-action-btn { color: #e9edef; }
+    :root[data-theme="dark"] .msg-action-btn .action-chevron { color: rgba(255,255,255,0.2); }
+    :root[data-theme="dark"] .msg-action-divider { background: rgba(255,255,255,0.08); }
+    :root[data-theme="dark"] .msg-action-cancel { border-top-color: rgba(255,255,255,0.08); }
+    :root[data-theme="dark"] .msg-actions-overlay.visible { background: rgba(0,0,0,0.5); }
     :root[data-theme="dark"] .pin-overlay { background: var(--bg); }
     :root[data-theme="dark"] .pin-input { background: #2a3942; color: #e9edef; border-color: var(--border); }
     :root[data-theme="dark"] .edit-indicator { background: #2a3942; color: #fcd34d; }
