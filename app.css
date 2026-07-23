@@ -543,6 +543,13 @@
 
     .viewer-overlay img {
       max-width: 95%; max-height: 90vh; object-fit: contain; border-radius: 4px;
+      touch-action: none;
+      transform-origin: 0 0;
+      transition: none;
+    }
+
+    .viewer-overlay img.zoom-animating {
+      transition: transform 0.25s ease;
     }
 
     .btn-viewer-close {
