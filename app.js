@@ -980,9 +980,9 @@
           text.textContent = 'جاري الضغط...';
           source = await compressImageToDataUrl(file);
         } else if (!isImage) {
-          if (file.size > 50 * 1024 * 1024) {
+          if (file.size > 500 * 1024 * 1024) {
             overlay.style.display = 'none';
-            alert('الملف كبير جداً. الحد الأقصى ٥٠ ميغابايت.');
+            alert('الملف كبير جداً. الحد الأقصى ٥٠٠ ميغابايت.');
             return;
           }
           fill.style.width = '15%';
