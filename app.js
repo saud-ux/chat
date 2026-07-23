@@ -705,6 +705,7 @@
       addListener(otherSeenRef, 'value', snap => {
         otherSeenTimestamp = snap.val() || 0;
         updateSeenIndicator();
+        refreshPresenceView(); // "online" is derived from a fresh seen heartbeat
       });
 
       // Typing indicator listener
@@ -722,19 +723,11 @@
 
       db.ref(`chats/${chatId}/typing/${user}`).onDisconnect().remove();
 
-      // Presence: mark myself "in the conversation" while this chat is open,
-      // and light up the header when the other person is here too.
-      const myPresenceRef = db.ref(`chats/${chatId}/presence/${user}`);
-      myPresenceRef.onDisconnect().remove();
+      // Presence: while this chat is open and foregrounded, heartbeat my "seen"
+      // timestamp; the other side reads it and lights up the header when it's
+      // fresh. We ride on the existing seen path (proven to sync both ways via
+      // read receipts) so no new database rule is needed.
       startPresence();
-
-      const otherPresenceRef = db.ref(`chats/${chatId}/presence/${otherUser}`);
-      addListener(otherPresenceRef, 'value', snap => {
-        const ts = snap.val() || 0;
-        // Consider them present only if their heartbeat is fresh (server time).
-        const online = ts && (Date.now() + serverTimeOffset - ts) < 45000;
-        updatePresenceIndicator(online);
-      });
 
       // Show notification prompt if permission not granted
       if ('Notification' in window && Notification.permission === 'default' && !localStorage.getItem('notif_dismissed_' + user)) {
@@ -2271,27 +2264,33 @@
     /* ==========================================================
        PRESENCE ("in the conversation" indicator)
     ========================================================== */
-    // Heartbeat my presence timestamp while the chat is open and visible, so
-    // the other side can tell I'm actively here. onDisconnect() clears it on a
-    // dropped connection; cleanup()/stopPresence() clears it when I leave.
-    function beatPresence() {
-      if (!currentChatId || !currentUser || !db) return;
-      if (document.hidden) return;
-      db.ref(`chats/${currentChatId}/presence/${currentUser}`).set(firebase.database.ServerValue.TIMESTAMP);
-    }
+    // How recent the other side's heartbeat must be to count as "online".
+    const PRESENCE_WINDOW = 45000;
 
+    // Heartbeat: while the chat is open and foregrounded, keep refreshing my own
+    // "seen" timestamp (every 15s) and re-evaluate whether the other side is
+    // still fresh. markSeen() already guards document.hidden and no-op cases.
     function startPresence() {
       clearInterval(presenceTimer);
-      beatPresence();
-      presenceTimer = setInterval(beatPresence, 15000);
+      markSeen();
+      refreshPresenceView();
+      presenceTimer = setInterval(() => {
+        markSeen();
+        refreshPresenceView();
+      }, 15000);
     }
 
     function stopPresence() {
       clearInterval(presenceTimer);
       presenceTimer = null;
-      if (currentChatId && currentUser && db) {
-        db.ref(`chats/${currentChatId}/presence/${currentUser}`).remove();
-      }
+      updatePresenceIndicator(false);
+    }
+
+    // Decide online/offline from the other side's most recent seen heartbeat.
+    function refreshPresenceView() {
+      const fresh = otherSeenTimestamp &&
+        (Date.now() + serverTimeOffset - otherSeenTimestamp) < PRESENCE_WINDOW;
+      updatePresenceIndicator(!!fresh);
     }
 
     function updatePresenceIndicator(online) {
