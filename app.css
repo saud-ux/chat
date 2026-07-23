@@ -66,7 +66,7 @@
       padding: 6px; display: flex; align-items: center; color: var(--muted);
       transition: transform 0.3s;
     }
-    .btn-refresh.spinning { animation: spin 0.8s linear; }
+    .spinning { animation: spin 0.8s linear infinite; }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
     .chat-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -791,6 +791,32 @@
     :root[data-theme="dark"] .msg-reply-quote { background: rgba(255,255,255,0.08); }
     :root[data-theme="dark"] .reply-preview { background: #2a3942; }
 
+    .header-actions {
+      display: flex; gap: 4px; margin-right: auto; align-items: center;
+    }
+
+    .header-action-btn {
+      background: rgba(0,0,0,0.06);
+      border: none; cursor: pointer;
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: #555;
+      transition: background 0.15s, transform 0.12s;
+    }
+
+    .header-action-btn:active { transform: scale(0.88); background: rgba(0,0,0,0.1); }
+
+    .header-action-btn svg { display: block; }
+
+    :root[data-theme="dark"] .header-action-btn {
+      background: rgba(255,255,255,0.08);
+      color: #a0aec0;
+    }
+    :root[data-theme="dark"] .header-action-btn:active {
+      background: rgba(255,255,255,0.15);
+    }
+
     .btn-theme {
       background: none; border: none; cursor: pointer; font-size: 20px;
       padding: 6px; display: flex; align-items: center;
@@ -1117,7 +1143,7 @@
     .btn-send:active { transform: scale(0.86); }
     .btn-attach { transition: transform 0.1s, color 0.2s; }
     .btn-attach:active { transform: scale(0.84); }
-    .btn-theme:active, .btn-refresh:active { transform: scale(0.85); }
+    .btn-refresh:active { transform: scale(0.85); }
     .btn-scroll-bottom { transition: transform 0.12s, opacity 0.2s; }
     .btn-scroll-bottom:active { transform: scale(0.88); }
 
