@@ -95,6 +95,8 @@
     let allMsgElements = [];
     let knownReactions = {};
     let currentWallpaper = null;
+    let ensureAllLoaded = null; // loads the full history for the open chat (used by search)
+    let requestLoadOlder = null; // fetches the previous page of older messages for the open chat
 
     /* ==========================================================
        DOM REFERENCES
@@ -229,6 +231,8 @@
       allMsgElements = [];
       knownReactions = {};
       currentWallpaper = null;
+      ensureAllLoaded = null;
+      requestLoadOlder = null;
       const ei = $('edit-indicator');
       if (ei) ei.style.display = 'none';
       const sb = $('btn-send');
@@ -432,20 +436,184 @@
         localStorage.setItem(`lastRead_${chatId}_${user}`, Date.now().toString());
       }
 
-      const ref = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp');
+      // Windowed loading: long conversations used to sync and render EVERY
+      // message on open, which made chats slow to load. Instead we render only
+      // the most recent PAGE_SIZE messages, then lazily fetch older history
+      // when the reader scrolls to the top.
+      const baseRef = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp');
+      const PAGE_SIZE = 50;
       let lastDateStr = '';
+      let loaded = [];               // chronological [{ key, msg }] of what's rendered
+      let renderedKeys = new Set();
+      let oldestLoadedTs = null;
+      let newestLoadedTs = 0;
+      let reachedStart = false;      // no older messages remain to load
+      let loadingOlder = false;
+      let changeListeners = [];      // child_changed / child_removed handles (re-bound as window grows)
 
-      addListener(ref, 'child_added', snap => {
-        const msg = snap.val();
+      const dateStrOf = (ts) => new Date(ts).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      // Build the DOM element for a single message (content, gestures, tracking).
+      function buildMsgEl(key, msg) {
         const isMine = msg.sender === user;
+        const el = document.createElement('div');
+        el.className = `message ${isMine ? 'message-mine' : 'message-theirs'}`;
+        el.dataset.key = key;
+        el.dataset.type = msg.type;
+        renderMsgContent(el, msg, isMine);
+        allMsgElements.push({ el, key, msg });
+        knownReactions[key] = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
+        if (isMine && !msg.deleted) {
+          myMessages.push({ el, timestamp: msg.timestamp });
+          if (msg.type !== 'game') {
+            addTapGestures(el, () => { burstHearts(el); addReaction(key, '❤️'); }, () => showMsgActions(key, msg.type, true));
+            addSwipeReply(el, key);
+          }
+          addLongPress(el, () => showMsgActions(key, msg.type, true));
+        } else if (!isMine && !msg.deleted) {
+          if (msg.type !== 'game') {
+            addTapGestures(el, () => { burstHearts(el); addReaction(key, '❤️'); }, () => showMsgActions(key, msg.type, false));
+            addSwipeReply(el, key);
+          }
+          addLongPress(el, () => showMsgActions(key, msg.type, false));
+        }
+        return el;
+      }
 
-        // Measure BEFORE appending: were we already near the bottom?
+      // Rebuild the whole message list from `loaded` (used on initial load and
+      // when older history is prepended). Keeps date separators correct.
+      function renderAll() {
+        area.innerHTML = '';
+        allMsgElements = [];
+        myMessages = [];
+        knownReactions = {};
+        lastDateStr = '';
+        loaded.forEach(({ key, msg }) => {
+          const dateStr = dateStrOf(msg.timestamp);
+          if (dateStr !== lastDateStr) {
+            lastDateStr = dateStr;
+            const sep = document.createElement('div');
+            sep.className = 'date-separator';
+            sep.innerHTML = `<span>${dateStr}</span>`;
+            area.appendChild(sep);
+          }
+          area.appendChild(buildMsgEl(key, msg));
+        });
+        updateSeenIndicator();
+      }
+
+      // Bind child_changed / child_removed to the currently-loaded range so
+      // edits, reactions and deletes stay live without syncing the whole history.
+      function attachChangeListeners() {
+        changeListeners.forEach(({ ref, event, cb }) => {
+          ref.off(event, cb);
+          const i = activeListeners.findIndex(l => l.ref === ref && l.event === event && l.cb === cb);
+          if (i !== -1) activeListeners.splice(i, 1);
+        });
+        changeListeners = [];
+        const q = baseRef.startAt(oldestLoadedTs != null ? oldestLoadedTs : 0);
+
+        const changedCb = snap => {
+          const msg = snap.val();
+          const el = document.querySelector(`[data-key="${snap.key}"]`);
+          if (!el) return;
+          const isMine = msg.sender === user;
+          if (isMine && !isFirstLoad[chatId] && msg.reactions) {
+            const oldReactions = knownReactions[snap.key] || {};
+            Object.entries(msg.reactions).forEach(([reactor, emoji]) => {
+              if (reactor !== user && oldReactions[reactor] !== emoji) {
+                const reactorName = reactor === 'saud' ? 'سعود' : (CONTACTS[reactor] ? CONTACTS[reactor].name : reactor);
+                notify(chatId, reactorName, `تفاعل على رسالتك ${emoji}`);
+              }
+            });
+          }
+          knownReactions[snap.key] = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
+          renderMsgContent(el, msg, isMine);
+          const entry = loaded.find(m => m.key === snap.key);
+          if (entry) entry.msg = msg;
+          if (msg.deleted && isMine) {
+            myMessages = myMessages.filter(m => m.el !== el);
+            updateSeenIndicator();
+          }
+        };
+
+        const removedCb = snap => {
+          const el = document.querySelector(`[data-key="${snap.key}"]`);
+          if (el) {
+            const prev = el.previousElementSibling;
+            const next = el.nextElementSibling;
+            if (prev && prev.classList.contains('date-separator') && (!next || next.classList.contains('date-separator'))) {
+              prev.remove();
+            }
+            el.remove();
+          }
+          myMessages = myMessages.filter(m => m.el !== el);
+          allMsgElements = allMsgElements.filter(m => m.key !== snap.key);
+          loaded = loaded.filter(m => m.key !== snap.key);
+          renderedKeys.delete(snap.key);
+          delete knownReactions[snap.key];
+          updateSeenIndicator();
+        };
+
+        q.on('child_changed', changedCb);
+        q.on('child_removed', removedCb);
+        changeListeners.push({ ref: q, event: 'child_changed', cb: changedCb });
+        changeListeners.push({ ref: q, event: 'child_removed', cb: removedCb });
+        activeListeners.push({ ref: q, event: 'child_changed', cb: changedCb });
+        activeListeners.push({ ref: q, event: 'child_removed', cb: removedCb });
+      }
+
+      // Fetch the previous page of older messages and prepend them.
+      function loadOlder(onDone) {
+        if (loadingOlder || reachedStart || oldestLoadedTs == null) { if (onDone) onDone(false); return; }
+        loadingOlder = true;
+        const prevHeight = area.scrollHeight;
+        const prevTop = area.scrollTop;
+        baseRef.endAt(oldestLoadedTs).limitToLast(PAGE_SIZE + 1).once('value', snap => {
+          if (currentChatId !== chatId) { loadingOlder = false; return; }
+          const older = [];
+          snap.forEach(c => { if (!renderedKeys.has(c.key)) older.push({ key: c.key, msg: c.val() }); });
+          if (older.length === 0) { reachedStart = true; loadingOlder = false; if (onDone) onDone(false); return; }
+          if (older.length < PAGE_SIZE) reachedStart = true;
+          older.forEach(it => renderedKeys.add(it.key));
+          loaded = older.concat(loaded);
+          oldestLoadedTs = loaded[0].msg.timestamp;
+          renderAll();
+          // Keep the reader anchored to the message they were viewing.
+          area.scrollTop = prevTop + (area.scrollHeight - prevHeight);
+          attachChangeListeners();
+          loadingOlder = false;
+          if (onDone) onDone(true);
+        });
+      }
+
+      // Pull the rest of the history in (used by search so it can span the
+      // whole conversation, not just the loaded window).
+      function loadAllOlder(onDone) {
+        if (reachedStart) { if (onDone) onDone(); return; }
+        loadOlder(gotMore => {
+          if (currentChatId !== chatId) return;
+          if (gotMore && !reachedStart) loadAllOlder(onDone);
+          else if (onDone) onDone();
+        });
+      }
+      ensureAllLoaded = loadAllOlder;
+
+      // Load newer messages that arrive after the initial window.
+      function handleNewMessage(key, msg) {
+        if (renderedKeys.has(key)) return;
+        renderedKeys.add(key);
+        const isMine = msg.sender === user;
         const wasNearBottom = area
           ? (area.scrollHeight - area.scrollTop - area.clientHeight) < 150
           : true;
+        loaded.push({ key, msg });
+        newestLoadedTs = msg.timestamp;
+        if (oldestLoadedTs == null) oldestLoadedTs = msg.timestamp;
 
-        const msgDate = new Date(msg.timestamp);
-        const dateStr = msgDate.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+        // If the list was emptied (e.g. by clearChat), force a fresh separator.
+        if (!area.querySelector('.message')) lastDateStr = '';
+        const dateStr = dateStrOf(msg.timestamp);
         if (dateStr !== lastDateStr) {
           lastDateStr = dateStr;
           const sep = document.createElement('div');
@@ -453,43 +621,21 @@
           sep.innerHTML = `<span>${dateStr}</span>`;
           area.appendChild(sep);
         }
+        area.appendChild(buildMsgEl(key, msg));
+        updateSeenIndicator();
 
-        const el = document.createElement('div');
-        el.className = `message ${isMine ? 'message-mine' : 'message-theirs'}`;
-        el.dataset.key = snap.key;
-        el.dataset.type = msg.type;
-
-        renderMsgContent(el, msg, isMine);
-        area.appendChild(el);
-        allMsgElements.push({ el, key: snap.key, msg });
-        knownReactions[snap.key] = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
-
-        if (isMine && !msg.deleted) {
-          myMessages.push({ el, timestamp: msg.timestamp });
-          updateSeenIndicator();
-          if (msg.type !== 'game') {
-            addTapGestures(el, () => { burstHearts(el); addReaction(snap.key, '❤️'); }, () => showMsgActions(snap.key, msg.type, true));
-            addSwipeReply(el, snap.key);
-          }
-          addLongPress(el, () => showMsgActions(snap.key, msg.type, true));
-        } else if (!isMine) {
-          if (!isFirstLoad[chatId]) {
-            db.ref(`chats/${chatId}/seen/${user}`).set(firebase.database.ServerValue.TIMESTAMP);
-          }
-          if (!msg.deleted) {
-            if (msg.type !== 'game') {
-              addTapGestures(el, () => { burstHearts(el); addReaction(snap.key, '❤️'); }, () => showMsgActions(snap.key, msg.type, false));
-              addSwipeReply(el, snap.key);
-            }
-            addLongPress(el, () => showMsgActions(snap.key, msg.type, false));
-          }
+        if (!isMine && !isFirstLoad[chatId]) {
+          db.ref(`chats/${chatId}/seen/${user}`).set(firebase.database.ServerValue.TIMESTAMP);
+        }
+        // Keep saud's read marker current while the chat is open so the home
+        // screen unread count stays accurate.
+        if (user === 'saud') {
+          localStorage.setItem(`lastRead_saud_${chatId}`, Date.now().toString());
         }
 
         if (isFirstLoad[chatId]) {
           scrollToBottom(false);
         } else {
-          // Only auto-scroll if it's my own message, or the reader was
-          // already at the bottom. Otherwise keep their place while reading.
           if (isMine || wasNearBottom) {
             scrollToBottom(true);
           } else {
@@ -500,47 +646,41 @@
             notify(chatId, name, msgPreview(msg));
           }
         }
+      }
+
+      // Initial window: only the most recent PAGE_SIZE messages.
+      baseRef.limitToLast(PAGE_SIZE).once('value', snap => {
+        if (currentChatId !== chatId) return;
+        const items = [];
+        snap.forEach(c => { items.push({ key: c.key, msg: c.val() }); });
+        items.forEach(it => renderedKeys.add(it.key));
+        loaded = items;
+        reachedStart = items.length < PAGE_SIZE;
+        oldestLoadedTs = items.length ? items[0].msg.timestamp : null;
+        newestLoadedTs = items.length ? items[items.length - 1].msg.timestamp : 0;
+        renderAll();
+        scrollToBottom(false);
+
+        // Live listener for messages newer than the initial window. startAt on
+        // the newest loaded timestamp re-delivers the boundary message, which the
+        // renderedKeys guard dedupes, so no message is ever missed or duplicated.
+        addListener(baseRef.startAt(newestLoadedTs), 'child_added', s => {
+          handleNewMessage(s.key, s.val());
+        });
+
+        attachChangeListeners();
       });
 
-      addListener(ref, 'child_changed', snap => {
-        const msg = snap.val();
-        const el = document.querySelector(`[data-key="${snap.key}"]`);
-        if (!el) return;
-        const isMine = msg.sender === user;
-
-        if (isMine && !isFirstLoad[chatId] && msg.reactions) {
-          const oldReactions = knownReactions[snap.key] || {};
-          Object.entries(msg.reactions).forEach(([reactor, emoji]) => {
-            if (reactor !== user && oldReactions[reactor] !== emoji) {
-              const reactorName = reactor === 'saud' ? 'سعود' : (CONTACTS[reactor] ? CONTACTS[reactor].name : reactor);
-              notify(chatId, reactorName, `تفاعل على رسالتك ${emoji}`);
-            }
-          });
-        }
-        knownReactions[snap.key] = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
-
-        renderMsgContent(el, msg, isMine);
-        if (msg.deleted && isMine) {
-          myMessages = myMessages.filter(m => m.el !== el);
-          updateSeenIndicator();
-        }
-      });
-
-      addListener(ref, 'child_removed', snap => {
-        const el = document.querySelector(`[data-key="${snap.key}"]`);
-        if (el) {
-          const prev = el.previousElementSibling;
-          const next = el.nextElementSibling;
-          if (prev && prev.classList.contains('date-separator') && (!next || next.classList.contains('date-separator'))) {
-            prev.remove();
-          }
-          el.remove();
-        }
-        myMessages = myMessages.filter(m => m.el !== el);
-        allMsgElements = allMsgElements.filter(m => m.key !== snap.key);
-        delete knownReactions[snap.key];
-        updateSeenIndicator();
-      });
+      // Lazily load older history when scrolled near the top. Bind the scroll
+      // handler once for the persistent messages-area element (it outlives
+      // individual chats) and route through the current chat's loader.
+      requestLoadOlder = loadOlder;
+      if (!area._olderBound) {
+        area._olderBound = true;
+        area.addEventListener('scroll', () => {
+          if (area.scrollTop < 80 && requestLoadOlder) requestLoadOlder();
+        });
+      }
 
       // Mark seen immediately on open so the double-tick reaches the sender fast
       db.ref(`chats/${chatId}/seen/${user}`).set(firebase.database.ServerValue.TIMESTAMP);
@@ -557,13 +697,6 @@
         otherSeenTimestamp = snap.val() || 0;
         updateSeenIndicator();
       });
-
-      if (isSaud) {
-        const markRef = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp');
-        addListener(markRef, 'child_added', () => {
-          localStorage.setItem(`lastRead_saud_${chatId}`, Date.now().toString());
-        });
-      }
 
       // Typing indicator listener
       const otherTypingRef = db.ref(`chats/${chatId}/typing/${otherUser}`);
@@ -2235,7 +2368,16 @@
 
     function scrollToMessage(key) {
       const el = document.querySelector(`[data-key="${key}"]`);
-      if (!el) return;
+      if (!el) {
+        // The quoted message may be older than the loaded window — pull in the
+        // rest of the history, then try again.
+        if (ensureAllLoaded) {
+          const pending = ensureAllLoaded;
+          ensureAllLoaded = null;
+          pending(() => scrollToMessage(key));
+        }
+        return;
+      }
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       el.style.outline = '2px solid var(--accent)';
       el.style.outlineOffset = '2px';
@@ -2678,6 +2820,15 @@
       if (!query) {
         document.querySelectorAll('.message').forEach(el => el.classList.remove('search-highlight', 'search-dim'));
         if (countEl) countEl.textContent = '';
+        return;
+      }
+      // Only the recent window is loaded up front; pull in older history so
+      // search covers the whole conversation, then re-run against everything.
+      if (ensureAllLoaded) {
+        const pending = ensureAllLoaded;
+        ensureAllLoaded = null;
+        if (countEl) countEl.textContent = '...';
+        pending(() => { if (searchOpen) performSearch(); });
         return;
       }
       let found = 0;
