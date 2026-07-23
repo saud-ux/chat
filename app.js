@@ -1738,12 +1738,11 @@
       return `<button class="msg-action-btn" onclick="${onclick}">
         <span class="action-icon ${iconClass}">${icon}</span>
         <span class="action-label">${label}</span>
-        <span class="action-chevron">‹</span>
       </button>`;
     }
 
     function showMsgActions(key, msgType, canEdit) {
-      let html = '<div class="msg-actions-handle"></div>';
+      let html = '';
       html += actionBtn('↩️', 'reply-icon', 'رد', `setReply('${key}')`);
       html += actionBtn('😀', 'react-icon', 'تفاعل', `hideMsgActions();openReactionPicker('${key}')`);
       if (msgType === 'text') {
@@ -1753,23 +1752,47 @@
         html += actionBtn('✏️', 'edit-icon', 'تعديل', `editMessage('${key}')`);
       }
       if (msgType === 'gif' || msgType === 'image') {
-        html += actionBtn('⭐', 'sticker-icon', 'حفظ كستيكر', `saveAsSticker('${key}')`);
+        html += actionBtn('⭐', 'sticker-icon', 'ستيكر', `saveAsSticker('${key}')`);
       }
       if (msgType !== 'game') {
         const saved = isSaved(key);
-        html += actionBtn(saved ? '★' : '⭐', 'save-icon', saved ? 'إزالة من المحفوظة' : 'حفظ الرسالة', `toggleSaveMessage('${key}')`);
+        html += actionBtn(saved ? '★' : '⭐', 'save-icon', saved ? 'محفوظ' : 'حفظ', `toggleSaveMessage('${key}')`);
       }
-      html += '<div class="msg-action-divider"></div>';
-      html += `<button class="msg-action-btn danger" onclick="deleteMessage('${key}')">
-        <span class="action-icon delete-icon">🗑️</span>
-        <span class="action-label">حذف</span>
-        <span class="action-chevron">‹</span>
-      </button>`;
-      html += `<button class="msg-action-btn msg-action-cancel" onclick="hideMsgActions()">إلغاء</button>`;
+      html += actionBtn('🗑️', 'delete-icon', 'حذف', `deleteMessage('${key}')`);
       $('msg-actions-content').innerHTML = html;
+
+      const msgEl = document.querySelector(`.message[data-key="${key}"]`);
+      if (msgEl) msgEl.classList.add('msg-highlighted');
+      const panel = $('msg-actions-content');
       const overlay = $('msg-actions-overlay');
-      overlay.style.display = 'flex';
+      overlay.style.display = 'block';
+
       requestAnimationFrame(() => {
+        const msgRect = msgEl ? msgEl.getBoundingClientRect() : null;
+        const panelW = panel.offsetWidth;
+        const panelH = panel.offsetHeight;
+
+        if (msgRect) {
+          let top = msgRect.top - panelH - 8;
+          if (top < 8) top = msgRect.bottom + 8;
+
+          const isMine = msgEl.classList.contains('message-mine');
+          let left;
+          if (isMine) {
+            left = msgRect.left;
+          } else {
+            left = msgRect.right - panelW;
+          }
+          left = Math.max(8, Math.min(left, window.innerWidth - panelW - 8));
+
+          panel.style.left = left + 'px';
+          panel.style.top = top + 'px';
+        } else {
+          panel.style.left = '50%';
+          panel.style.top = '50%';
+          panel.style.transform = 'translate(-50%, -50%) scale(0.8)';
+        }
+
         requestAnimationFrame(() => overlay.classList.add('visible'));
       });
       haptic(12);
@@ -1778,7 +1801,15 @@
     function hideMsgActions() {
       const overlay = $('msg-actions-overlay');
       overlay.classList.remove('visible');
-      setTimeout(() => { overlay.style.display = 'none'; }, 350);
+      const panel = $('msg-actions-content');
+      const hl = document.querySelector('.msg-highlighted');
+      if (hl) hl.classList.remove('msg-highlighted');
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        panel.style.left = '';
+        panel.style.top = '';
+        panel.style.transform = '';
+      }, 250);
     }
 
     function deleteMessage(key) {
@@ -1954,16 +1985,19 @@
        Stored as a 'game' message so both players share live state.
     ========================================================== */
     function openGamePicker() {
-      let html = '<div class="msg-actions-handle"></div>';
-      html += actionBtn('⭕', 'react-icon', 'إكس أو (XO)', `hideMsgActions();startXO()`);
-      html += actionBtn('✊✋✌️', 'react-icon', 'حجرة ورقة مقص', `hideMsgActions();startRPS()`);
-      html += actionBtn('🔴', 'react-icon', 'أربعة في خط', `hideMsgActions();startC4()`);
-      html += actionBtn('🔢', 'react-icon', 'خمّن الرقم', `hideMsgActions();startGuess()`);
-      html += `<button class="msg-action-btn msg-action-cancel" onclick="hideMsgActions()">إلغاء</button>`;
-      $('msg-actions-content').innerHTML = html;
+      let html = '';
+      html += actionBtn('⭕', 'react-icon', 'XO', `hideMsgActions();startXO()`);
+      html += actionBtn('✊', 'react-icon', 'حجرة', `hideMsgActions();startRPS()`);
+      html += actionBtn('🔴', 'react-icon', 'أربعة', `hideMsgActions();startC4()`);
+      html += actionBtn('🔢', 'react-icon', 'خمّن', `hideMsgActions();startGuess()`);
+      const panel = $('msg-actions-content');
+      panel.innerHTML = html;
       const overlay = $('msg-actions-overlay');
-      overlay.style.display = 'flex';
+      overlay.style.display = 'block';
       requestAnimationFrame(() => {
+        const pw = panel.offsetWidth;
+        panel.style.left = ((window.innerWidth - pw) / 2) + 'px';
+        panel.style.top = '40%';
         requestAnimationFrame(() => overlay.classList.add('visible'));
       });
     }
