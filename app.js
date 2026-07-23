@@ -2453,7 +2453,7 @@
     function emojiOnlyCount(raw) {
       const t = (raw || '').trim();
       if (!t) return 0;
-      if (/[0-9A-Za-z؀-ۿ]/.test(t)) return 0; // has letters/digits
+      if (/[0-9A-Za-z؀-ۿ]/.test(t)) return 0;
       let pictographic;
       try { pictographic = /\p{Extended_Pictographic}/u.test(t); } catch (e) { return 0; }
       if (!pictographic) return 0;
@@ -2461,7 +2461,8 @@
       let count;
       try { count = [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(noSpace)].length; }
       catch (e) { count = Array.from(noSpace).length; }
-      return count <= 3 ? count : 0;
+      if (count <= 3) return count;
+      return 4;
     }
 
     function formatTime(ts) {
