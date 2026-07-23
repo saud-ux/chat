@@ -39,9 +39,12 @@
     const IS_CONFIGURED = firebaseConfig.apiKey !== "YOUR_API_KEY";
 
     let db;
+    let serverTimeOffset = 0;
     if (IS_CONFIGURED) {
       firebase.initializeApp(firebaseConfig);
       db = firebase.database();
+      // Track clock skew so presence "online" checks use server-relative time.
+      db.ref('.info/serverTimeOffset').on('value', s => { serverTimeOffset = s.val() || 0; });
     }
 
     /* ==========================================================
@@ -89,6 +92,7 @@
     let editingKey = null;
     let typingTimer = null;
     let typingCheckInterval = null;
+    let presenceTimer = null;
     let replyToKey = null;
     let replyToMsg = null;
     let searchOpen = false;
@@ -212,6 +216,7 @@
       if (currentChatId && currentUser && db) {
         db.ref(`chats/${currentChatId}/typing/${currentUser}`).remove();
       }
+      stopPresence();
       clearTimeout(typingTimer);
       clearInterval(typingCheckInterval);
       activeListeners.forEach(({ ref, event, cb }) => ref.off(event, cb));
@@ -370,8 +375,12 @@
         ${isSaud ? '<button class="btn-back" onclick="exitChatSmoothly(\'/\')">→</button>' : ''}
         <div class="chat-header-avatar" style="background:${partnerColor}">
           ${partnerAvatar}
+          <span class="presence-dot" id="presence-dot"></span>
         </div>
-        <span class="chat-header-name">${partnerName}</span>
+        <div class="chat-header-info">
+          <span class="chat-header-name">${partnerName}</span>
+          <span class="chat-header-status" id="chat-header-status"></span>
+        </div>
         <div style="display:flex;gap:2px;margin-right:auto;align-items:center">
           <button class="btn-theme" onclick="openGamePicker()" aria-label="لعبة">🎮</button>
           <button class="btn-theme" onclick="toggleSearch()" aria-label="بحث">🔍</button>
@@ -712,6 +721,20 @@
       });
 
       db.ref(`chats/${chatId}/typing/${user}`).onDisconnect().remove();
+
+      // Presence: mark myself "in the conversation" while this chat is open,
+      // and light up the header when the other person is here too.
+      const myPresenceRef = db.ref(`chats/${chatId}/presence/${user}`);
+      myPresenceRef.onDisconnect().remove();
+      startPresence();
+
+      const otherPresenceRef = db.ref(`chats/${chatId}/presence/${otherUser}`);
+      addListener(otherPresenceRef, 'value', snap => {
+        const ts = snap.val() || 0;
+        // Consider them present only if their heartbeat is fresh (server time).
+        const online = ts && (Date.now() + serverTimeOffset - ts) < 45000;
+        updatePresenceIndicator(online);
+      });
 
       // Show notification prompt if permission not granted
       if ('Notification' in window && Notification.permission === 'default' && !localStorage.getItem('notif_dismissed_' + user)) {
@@ -2246,6 +2269,42 @@
     }
 
     /* ==========================================================
+       PRESENCE ("in the conversation" indicator)
+    ========================================================== */
+    // Heartbeat my presence timestamp while the chat is open and visible, so
+    // the other side can tell I'm actively here. onDisconnect() clears it on a
+    // dropped connection; cleanup()/stopPresence() clears it when I leave.
+    function beatPresence() {
+      if (!currentChatId || !currentUser || !db) return;
+      if (document.hidden) return;
+      db.ref(`chats/${currentChatId}/presence/${currentUser}`).set(firebase.database.ServerValue.TIMESTAMP);
+    }
+
+    function startPresence() {
+      clearInterval(presenceTimer);
+      beatPresence();
+      presenceTimer = setInterval(beatPresence, 15000);
+    }
+
+    function stopPresence() {
+      clearInterval(presenceTimer);
+      presenceTimer = null;
+      if (currentChatId && currentUser && db) {
+        db.ref(`chats/${currentChatId}/presence/${currentUser}`).remove();
+      }
+    }
+
+    function updatePresenceIndicator(online) {
+      const dot = $('presence-dot');
+      const status = $('chat-header-status');
+      if (dot) dot.classList.toggle('online', !!online);
+      if (status) {
+        status.textContent = online ? 'متصل الآن' : '';
+        status.classList.toggle('online', !!online);
+      }
+    }
+
+    /* ==========================================================
        PIN PROTECTION
     ========================================================== */
     function isPinVerified() {
@@ -2964,8 +3023,17 @@
     // Re-confirm "seen" the moment the user returns to an open chat, so the
     // sender's tick flips to double without waiting for a new message.
     document.addEventListener('visibilitychange', function() {
-      if (!document.hidden) markSeen();
-      else releaseMic(); // free the mic (and its indicator) when backgrounded
+      if (!document.hidden) {
+        markSeen();
+        // Resume the presence heartbeat when returning to an open chat.
+        if (currentChatId && currentUser && db) startPresence();
+      } else {
+        releaseMic(); // free the mic (and its indicator) when backgrounded
+        stopPresence(); // drop "online" while backgrounded
+      }
     });
     window.addEventListener('focus', markSeen);
-    window.addEventListener('pagehide', releaseMic);
+    window.addEventListener('pagehide', function() {
+      releaseMic();
+      stopPresence();
+    });

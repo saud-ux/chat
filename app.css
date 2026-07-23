@@ -131,9 +131,33 @@
       width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       font-size: 18px; font-weight: 700; color: #fff;
+      position: relative;
     }
 
-    .chat-header-name { font-size: 17px; font-weight: 600; flex: 1; }
+    .presence-dot {
+      position: absolute; bottom: 0; left: 0;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: transparent; border: 2px solid var(--header-bg);
+      transform: scale(0); transition: transform .2s ease, background .2s ease;
+    }
+    .presence-dot.online { background: #34c759; transform: scale(1); }
+
+    .chat-header-info {
+      flex: 1; display: flex; flex-direction: column;
+      justify-content: center; min-width: 0; line-height: 1.2;
+    }
+
+    .chat-header-name {
+      font-size: 17px; font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .chat-header-status {
+      font-size: 12px; color: #34c759; font-weight: 500;
+      height: 0; opacity: 0; overflow: hidden;
+      transition: opacity .2s ease;
+    }
+    .chat-header-status.online { height: auto; opacity: 1; }
 
     .btn-clear-chat {
       background: none; border: none; cursor: pointer;
