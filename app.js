@@ -714,7 +714,7 @@
           } else {
             showNewMsgPill();
           }
-          if (!isMine) {
+          if (!isMine && document.hidden) {
             const name = user === 'saud' ? CONTACTS[chatId].name : 'سعود';
             notify(chatId, name, msgPreview(msg));
           }
