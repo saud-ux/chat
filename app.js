@@ -103,6 +103,8 @@
     let currentWallpaper = null;
     let ensureAllLoaded = null; // loads the full history for the open chat (used by search)
     let requestLoadOlder = null; // fetches the previous page of older messages for the open chat
+    let activeGameRef = null;
+    let activeGameCb = null;
 
     /* ==========================================================
        DOM REFERENCES
@@ -272,6 +274,7 @@
     function showHome(user) {
       homeUser = user || 'saud';
       currentHomePage = 'chats';
+      stopActiveGame();
       const cp = $('swipe-page-chats');
       const gp = $('swipe-page-games');
       if (cp) cp.style.transform = '';
@@ -2226,24 +2229,72 @@
       else if (gameType === 'guess') startGuess();
     }
 
-    function pickPartnerForGame(gameType) {
-      const gameFn = gameType === 'xo' ? 'XO' : gameType === 'rps' ? 'RPS' : gameType === 'c4' ? 'C4' : 'Guess';
+    function stopActiveGame() {
+      if (activeGameRef && activeGameCb) {
+        activeGameRef.off('value', activeGameCb);
+      }
+      activeGameRef = null;
+      activeGameCb = null;
+    }
 
+    function startGameInline(gameType, chatId, user) {
+      currentChatId = chatId;
+      currentUser = user;
+      startGameByType(gameType);
+      const msgRef = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp').limitToLast(1);
+      msgRef.once('value', snap => {
+        let gameKey = null;
+        snap.forEach(child => { gameKey = child.key; });
+        if (gameKey) listenToActiveGame(chatId, gameKey);
+      });
+    }
+
+    function listenToActiveGame(chatId, gameKey) {
+      stopActiveGame();
+      const activeArea = $('games-active');
+      if (!activeArea) return;
+      activeGameRef = db.ref(`chats/${chatId}/messages/${gameKey}`);
+      activeGameCb = (snap) => {
+        const msg = snap.val();
+        if (!msg || msg.type !== 'game') return;
+        let html = '';
+        if (msg.game === 'rps') html = renderRPS(msg, gameKey);
+        else if (msg.game === 'c4') html = renderC4(msg, gameKey);
+        else if (msg.game === 'guess') html = renderGuess(msg, gameKey);
+        else html = renderXO(msg, gameKey);
+        const partnerName = CONTACTS[msg.px === currentUser ? msg.po : msg.px]?.name || '';
+        activeArea.innerHTML = `<div class="game-active-card">
+          <div class="game-active-header">
+            <span>مع ${partnerName}</span>
+            <button class="game-close-btn" onclick="closeActiveGame()">✕</button>
+          </div>
+          <div class="game-active-body">${html}</div>
+        </div>`;
+        activeArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      };
+      activeGameRef.on('value', activeGameCb);
+    }
+
+    function closeActiveGame() {
+      stopActiveGame();
+      const activeArea = $('games-active');
+      if (activeArea) activeArea.innerHTML = '';
+    }
+
+    function pickPartnerForGame(gameType) {
       if (homeUser === 'w') {
-        navigate('/w/chat');
-        setTimeout(() => startGameByType(gameType), 600);
+        startGameInline(gameType, 'w', 'w');
         return;
       }
       if (homeUser === 'aseel') {
-        navigate('/aseel/chat');
-        setTimeout(() => startGameByType(gameType), 600);
+        startGameInline(gameType, 'aseel', 'aseel');
         return;
       }
 
       const partners = ['w', 'aseel'];
       let html = '';
       partners.forEach(id => {
-        html += `<div class="game-partner-card" onclick="hideMsgActions();navigate('/chat/${id}');setTimeout(()=>start${gameFn}(),600)">
+        html += `<div class="game-partner-card" onclick="hideMsgActions();startGameInline('${gameType}','${id}','saud')">
           <div class="chat-avatar" style="background:${CONTACTS[id].color}">${AVATARS[id]}</div>
           <span>${CONTACTS[id].name}</span>
         </div>`;
@@ -2281,7 +2332,7 @@
           <span class="game-card-desc">1 إلى 100</span>
         </div>`;
 
-      activeArea.innerHTML = '';
+      if (!activeGameRef) activeArea.innerHTML = '';
     }
 
     function openGamePicker() {

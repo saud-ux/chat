@@ -553,6 +553,32 @@
       color: #10b981;
     }
 
+    .game-active-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px;
+      font-size: 13px; font-weight: 600;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .game-close-btn {
+      background: none; border: none;
+      font-size: 18px; color: var(--muted);
+      cursor: pointer; padding: 0 4px;
+      line-height: 1;
+    }
+
+    .game-active-body {
+      padding: 12px 8px;
+    }
+
+    .games-active .game-active-card {
+      display: flex; flex-direction: column;
+      gap: 0; align-items: stretch;
+      cursor: default; padding: 0;
+      overflow: hidden;
+    }
+
     .games-empty {
       text-align: center;
       color: var(--muted);
