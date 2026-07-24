@@ -1331,7 +1331,7 @@
 
         video.onloadedmetadata = () => {
           let w = video.videoWidth, h = video.videoHeight;
-          const maxDim = 640;
+          const maxDim = 1280;
           if (w > maxDim || h > maxDim) {
             if (w >= h) { h = Math.round((maxDim / w) * h); w = maxDim; }
             else { w = Math.round((maxDim / h) * w); h = maxDim; }
@@ -1344,7 +1344,7 @@
           canvas.height = h;
           const ctx = canvas.getContext('2d');
 
-          const stream = canvas.captureStream(24);
+          const stream = canvas.captureStream(30);
           try {
             const audioCtx2 = new (window.AudioContext || window.webkitAudioContext)();
             const source = audioCtx2.createMediaElementSource(video);
@@ -1355,7 +1355,7 @@
 
           const recorder = new MediaRecorder(stream, {
             mimeType: mimeType,
-            videoBitsPerSecond: 600000
+            videoBitsPerSecond: 2500000
           });
           const chunks = [];
           recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
