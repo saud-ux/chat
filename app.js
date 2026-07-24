@@ -2914,19 +2914,12 @@
 
     function savePushSubscription(sub) {
       if (!db) return;
-      const userId = currentUser || inferUserId();
-      if (!userId) return;
+      const userId = APP_USER;
       const subData = sub.toJSON();
       const subKey = btoa(subData.endpoint).replace(/[.#$\[\]\/]/g, '_').substring(0, 100);
       db.ref(`push-subscriptions/${userId}/${subKey}`).set(subData);
-    }
-
-    function inferUserId() {
-      const path = window.location.pathname.replace(/\/+$/, '') || '/';
-      if (path === '/w') return 'w';
-      if (path === '/aseel') return 'aseel';
-      if (path === '/' || path.startsWith('/chat/')) return 'saud';
-      return null;
+      const others = ['saud', 'w', 'aseel'].filter(u => u !== userId);
+      others.forEach(u => db.ref(`push-subscriptions/${u}/${subKey}`).remove());
     }
 
     function urlBase64ToUint8Array(base64String) {
