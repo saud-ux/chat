@@ -52,7 +52,8 @@
     ========================================================== */
     const CONTACTS = {
       w: { name: 'W', color: '#5B8FB9' },
-      aseel: { name: 'أسيل', color: '#E8A87C' }
+      aseel: { name: 'أسيل', color: '#E8A87C' },
+      saud: { name: 'سعود', color: '#6C5CE7' }
     };
 
     const VAPID_PUBLIC_KEY = 'BOIMSoH3ZuHz_eL09w-2cOw7FSGyTTew3q3XlJsuwe4yBvnEbi1ee3mnwz3hOvS4rA_SigRsest_GbV_KgLZPV8';
@@ -60,7 +61,8 @@
 
     const AVATARS = {
       w: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#5B8FB9"/><text x="24" y="31" text-anchor="middle" fill="#fff" font-size="22" font-weight="700" font-family="Arial, sans-serif">W</text></svg>',
-      aseel: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#E8A87C"/><text x="24" y="31" text-anchor="middle" fill="#fff" font-size="22" font-weight="700" font-family="Arial, sans-serif">A</text></svg>'
+      aseel: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#E8A87C"/><text x="24" y="31" text-anchor="middle" fill="#fff" font-size="22" font-weight="700" font-family="Arial, sans-serif">A</text></svg>',
+      saud: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#6C5CE7"/><text x="24" y="31" text-anchor="middle" fill="#fff" font-size="22" font-weight="700" font-family="Arial, sans-serif">S</text></svg>'
     };
 
     /* ==========================================================
@@ -148,7 +150,7 @@
       if (path === '/' || path === '/index.html') {
         currentView = 'home';
         $('page-home').classList.add('active');
-        showHome();
+        showHome('saud');
       } else if (path === '/chat/w') {
         currentView = 'chat';
         $('page-chat').classList.add('active');
@@ -158,17 +160,25 @@
         $('page-chat').classList.add('active');
         showChat('aseel', 'saud');
       } else if (path === '/w') {
-        currentView = 'person';
+        currentView = 'home';
+        $('page-home').classList.add('active');
+        showHome('w');
+      } else if (path === '/w/chat') {
+        currentView = 'chat';
         $('page-chat').classList.add('active');
         showChat('w', 'w');
       } else if (path === '/aseel') {
-        currentView = 'person';
+        currentView = 'home';
+        $('page-home').classList.add('active');
+        showHome('aseel');
+      } else if (path === '/aseel/chat') {
+        currentView = 'chat';
         $('page-chat').classList.add('active');
         showChat('aseel', 'aseel');
       } else {
         currentView = 'home';
         $('page-home').classList.add('active');
-        showHome();
+        showHome('saud');
       }
     }
 
@@ -186,16 +196,15 @@
       const chat = $('page-chat');
       const home = $('page-home');
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (!chat || !home || !chat.classList.contains('active') || currentUser !== 'saud' || reduce) {
+      if (!chat || !home || !chat.classList.contains('active') || reduce) {
         navigate(path);
         return;
       }
-      // Real navigation state, minus the visual swap of the chat page.
       history.pushState(null, '', path);
       cleanup();
       currentView = 'home';
       home.classList.add('active');
-      showHome();
+      showHome(homeUser);
       // Slide the (still-visible) chat page off to the left over the home page.
       chat.classList.add('page-exiting');
       chat.style.zIndex = '50';
@@ -258,7 +267,10 @@
     /* ==========================================================
        HOME PAGE
     ========================================================== */
-    function showHome() {
+    let homeUser = 'saud';
+
+    function showHome(user) {
+      homeUser = user || 'saud';
       currentHomePage = 'chats';
       const cp = $('swipe-page-chats');
       const gp = $('swipe-page-games');
@@ -284,18 +296,31 @@
       const list = $('chat-list');
       list.innerHTML = '';
 
-      ['w', 'aseel'].forEach(chatId => {
+      let chatPartners, chatPath;
+      if (homeUser === 'saud') {
+        chatPartners = ['w', 'aseel'];
+        chatPath = (id) => `/chat/${id}`;
+      } else if (homeUser === 'w') {
+        chatPartners = ['saud'];
+        chatPath = () => '/w/chat';
+      } else {
+        chatPartners = ['saud'];
+        chatPath = () => '/aseel/chat';
+      }
+
+      chatPartners.forEach(partnerId => {
+        const chatId = homeUser === 'saud' ? partnerId : homeUser;
         const card = document.createElement('div');
         card.className = 'chat-card';
-        card.id = `card-${chatId}`;
-        card.onclick = (e) => navigate(`/chat/${chatId}`, e);
+        card.id = `card-${partnerId}`;
+        card.onclick = (e) => navigate(chatPath(partnerId), e);
         card.innerHTML = `
-          <div class="chat-avatar" style="background:${CONTACTS[chatId].color}">
-            ${AVATARS[chatId]}
+          <div class="chat-avatar" style="background:${CONTACTS[partnerId].color}">
+            ${AVATARS[partnerId]}
           </div>
           <div class="chat-info">
             <div class="chat-name">
-              <span>${CONTACTS[chatId].name}</span>
+              <span>${CONTACTS[partnerId].name}</span>
               <span class="chat-time" id="time-${chatId}"></span>
             </div>
             <div class="chat-preview-row">
@@ -310,28 +335,31 @@
           let lastMsg = null;
           snap.forEach(child => { lastMsg = child.val(); });
           if (lastMsg) {
-            $(`preview-${chatId}`).textContent = msgPreview(lastMsg);
-            $(`time-${chatId}`).textContent = formatRelative(lastMsg.timestamp);
+            const previewEl = $(`preview-${chatId}`);
+            const timeEl = $(`time-${chatId}`);
+            if (previewEl) previewEl.textContent = msgPreview(lastMsg);
+            if (timeEl) timeEl.textContent = formatRelative(lastMsg.timestamp);
           }
         });
 
-        updateUnreadForChat(chatId);
+        updateUnreadForChat(chatId, homeUser);
       });
 
       requestNotifPermission();
-      listenForHomeNotifications();
+      listenForHomeNotifications(homeUser, chatPartners);
     }
 
-    function updateUnreadForChat(chatId) {
+    function updateUnreadForChat(chatId, user) {
       if (!IS_CONFIGURED) return;
-      const lastRead = parseInt(localStorage.getItem(`lastRead_saud_${chatId}`) || '0');
+      user = user || 'saud';
+      const lastRead = parseInt(localStorage.getItem(`lastRead_${user}_${chatId}`) || '0');
       const ref = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp');
       const startRef = lastRead ? ref.startAt(lastRead + 1) : ref;
 
       addListener(startRef, 'value', snap => {
         let count = 0;
         snap.forEach(child => {
-          if (child.val().sender !== 'saud') count++;
+          if (child.val().sender !== user) count++;
         });
         totalUnread[chatId] = count;
         const badge = $(`badge-${chatId}`);
@@ -343,15 +371,18 @@
       });
     }
 
-    function listenForHomeNotifications() {
-      ['w', 'aseel'].forEach(chatId => {
+    function listenForHomeNotifications(user, partners) {
+      user = user || 'saud';
+      const chatIds = user === 'saud' ? ['w', 'aseel'] : [user];
+      chatIds.forEach(chatId => {
         const ref = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp').limitToLast(1);
         let initial = true;
         addListener(ref, 'child_added', snap => {
           if (initial) { initial = false; return; }
           const msg = snap.val();
-          if (msg.sender !== 'saud') {
-            notify(chatId, CONTACTS[chatId].name, msgPreview(msg));
+          if (msg.sender !== user) {
+            const partnerName = user === 'saud' ? CONTACTS[chatId].name : CONTACTS.saud.name;
+            notify(chatId, partnerName, msgPreview(msg));
           }
         });
       });
@@ -377,16 +408,16 @@
       isFirstLoad[chatId] = true;
 
       const isSaud = user === 'saud';
-      const partnerName = isSaud ? CONTACTS[chatId].name : 'سعود';
-      const partnerColor = isSaud ? CONTACTS[chatId].color : '#5B8FB9';
-      const partnerAvatar = isSaud ? AVATARS[chatId] :
-        '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#5B8FB9"/><text x="24" y="31" text-anchor="middle" fill="#fff" font-size="20" font-weight="700" font-family="Arial, sans-serif">س</text></svg>';
+      const partnerId = isSaud ? chatId : 'saud';
+      const partnerName = CONTACTS[partnerId].name;
+      const partnerColor = CONTACTS[partnerId].color;
+      const partnerAvatar = AVATARS[partnerId];
 
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
       const sunSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
       const moonSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>';
       $('chat-header').innerHTML = `
-        ${isSaud ? '<button class="btn-back" onclick="exitChatSmoothly(\'/\')">→</button>' : ''}
+        <button class="btn-back" onclick="exitChatSmoothly('${isSaud ? '/' : '/' + user}')">→</button>
         <div class="chat-header-avatar" style="background:${partnerColor}">
           ${partnerAvatar}
           <span class="presence-dot" id="presence-dot"></span>
@@ -2188,21 +2219,31 @@
       });
     })();
 
+    function startGameByType(gameType) {
+      if (gameType === 'xo') startXO();
+      else if (gameType === 'rps') startRPS();
+      else if (gameType === 'c4') startC4();
+      else if (gameType === 'guess') startGuess();
+    }
+
     function pickPartnerForGame(gameType) {
-      const chatIds = ['w', 'aseel'].filter(id => id !== currentUser);
-      if (chatIds.length === 1) {
-        navigate(`/chat/${chatIds[0]}`);
-        setTimeout(() => {
-          if (gameType === 'xo') startXO();
-          else if (gameType === 'rps') startRPS();
-          else if (gameType === 'c4') startC4();
-          else if (gameType === 'guess') startGuess();
-        }, 600);
+      const gameFn = gameType === 'xo' ? 'XO' : gameType === 'rps' ? 'RPS' : gameType === 'c4' ? 'C4' : 'Guess';
+
+      if (homeUser === 'w') {
+        navigate('/w/chat');
+        setTimeout(() => startGameByType(gameType), 600);
         return;
       }
+      if (homeUser === 'aseel') {
+        navigate('/aseel/chat');
+        setTimeout(() => startGameByType(gameType), 600);
+        return;
+      }
+
+      const partners = ['w', 'aseel'];
       let html = '';
-      chatIds.forEach(id => {
-        html += `<div class="game-partner-card" onclick="navigate('/chat/${id}');setTimeout(()=>{start${gameType === 'xo' ? 'XO' : gameType === 'rps' ? 'RPS' : gameType === 'c4' ? 'C4' : 'Guess'}()},600)">
+      partners.forEach(id => {
+        html += `<div class="game-partner-card" onclick="hideMsgActions();navigate('/chat/${id}');setTimeout(()=>start${gameFn}(),600)">
           <div class="chat-avatar" style="background:${CONTACTS[id].color}">${AVATARS[id]}</div>
           <span>${CONTACTS[id].name}</span>
         </div>`;
