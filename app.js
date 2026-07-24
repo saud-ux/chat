@@ -1597,7 +1597,11 @@
       clearTimeout(toastTimer);
       $('toast').style.display = 'none';
       if (toastChatId && currentView === 'home') {
-        navigate(`/chat/${toastChatId}`);
+        if (homeUser === 'saud') {
+          navigate(`/chat/${toastChatId}`);
+        } else {
+          navigate(`/${homeUser}/chat`);
+        }
       }
     }
 
