@@ -714,7 +714,7 @@
           } else {
             showNewMsgPill();
           }
-          if (!isMine && document.hidden) {
+          if (!isMine) {
             const name = user === 'saud' ? CONTACTS[chatId].name : 'سعود';
             notify(chatId, name, msgPreview(msg));
           }
@@ -1571,6 +1571,7 @@
     }
 
     function notify(chatId, title, body) {
+      if (currentView === 'chat' && currentChatId === chatId && !document.hidden) return;
       showToast(chatId, title, body);
       playSound();
       if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
