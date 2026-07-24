@@ -121,6 +121,13 @@
     /* ==========================================================
        ROUTER
     ========================================================== */
+    const APP_USER = (function() {
+      const p = window.location.pathname;
+      if (p.startsWith('/w')) return 'w';
+      if (p.startsWith('/aseel')) return 'aseel';
+      return 'saud';
+    })();
+
     function route() {
       cleanup();
       const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -130,10 +137,10 @@
       // Dynamic manifest for PWA home screen
       const manifestLink = document.querySelector('link[rel="manifest"]');
       const appleTitleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
-      if (path === '/w') {
+      if (APP_USER === 'w') {
         manifestLink.href = '/manifest-w.json';
         appleTitleMeta.content = 'W';
-      } else if (path === '/aseel') {
+      } else if (APP_USER === 'aseel') {
         manifestLink.href = '/manifest-aseel.json';
         appleTitleMeta.content = 'أسيل';
       } else {
@@ -142,45 +149,46 @@
       }
 
       // PIN protection for Saud's routes
-      const saudRoutes = ['/', '/index.html', '/chat/w', '/chat/aseel'];
-      if (saudRoutes.includes(path) && !isPinVerified()) {
+      if (APP_USER === 'saud' && !isPinVerified()) {
         showPinOverlay();
         return;
       }
       $('pin-overlay').style.display = 'none';
 
-      if (path === '/' || path === '/index.html') {
-        currentView = 'home';
-        $('page-home').classList.add('active');
-        showHome('saud');
-      } else if (path === '/chat/w') {
-        currentView = 'chat';
-        $('page-chat').classList.add('active');
-        showChat('w', 'saud');
-      } else if (path === '/chat/aseel') {
-        currentView = 'chat';
-        $('page-chat').classList.add('active');
-        showChat('aseel', 'saud');
-      } else if (path === '/w') {
-        currentView = 'home';
-        $('page-home').classList.add('active');
-        showHome('w');
-      } else if (path === '/w/chat') {
-        currentView = 'chat';
-        $('page-chat').classList.add('active');
-        showChat('w', 'w');
-      } else if (path === '/aseel') {
-        currentView = 'home';
-        $('page-home').classList.add('active');
-        showHome('aseel');
-      } else if (path === '/aseel/chat') {
-        currentView = 'chat';
-        $('page-chat').classList.add('active');
-        showChat('aseel', 'aseel');
+      if (APP_USER === 'saud') {
+        if (path === '/chat/w') {
+          currentView = 'chat';
+          $('page-chat').classList.add('active');
+          showChat('w', 'saud');
+        } else if (path === '/chat/aseel') {
+          currentView = 'chat';
+          $('page-chat').classList.add('active');
+          showChat('aseel', 'saud');
+        } else {
+          currentView = 'home';
+          $('page-home').classList.add('active');
+          showHome('saud');
+        }
+      } else if (APP_USER === 'w') {
+        if (path === '/w/chat') {
+          currentView = 'chat';
+          $('page-chat').classList.add('active');
+          showChat('w', 'w');
+        } else {
+          currentView = 'home';
+          $('page-home').classList.add('active');
+          showHome('w');
+        }
       } else {
-        currentView = 'home';
-        $('page-home').classList.add('active');
-        showHome('saud');
+        if (path === '/aseel/chat') {
+          currentView = 'chat';
+          $('page-chat').classList.add('active');
+          showChat('aseel', 'aseel');
+        } else {
+          currentView = 'home';
+          $('page-home').classList.add('active');
+          showHome('aseel');
+        }
       }
     }
 
@@ -221,7 +229,7 @@
     }
 
     function goToGamesPage() {
-      const homePath = homeUser === 'saud' ? '/' : '/' + homeUser;
+      const homePath = APP_USER === 'saud' ? '/' : '/' + APP_USER;
       exitChatSmoothly(homePath);
       setTimeout(() => swipeTo('games'), 350);
     }
@@ -1597,10 +1605,10 @@
       clearTimeout(toastTimer);
       $('toast').style.display = 'none';
       if (toastChatId && currentView === 'home') {
-        if (homeUser === 'saud') {
+        if (APP_USER === 'saud') {
           navigate(`/chat/${toastChatId}`);
         } else {
-          navigate(`/${homeUser}/chat`);
+          navigate(`/${APP_USER}/chat`);
         }
       }
     }
