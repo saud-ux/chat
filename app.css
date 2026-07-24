@@ -398,36 +398,51 @@
     }
 
     /* ===== TAB BAR ===== */
-    .chat-tab-bar {
+    /* ===== SWIPE CONTAINER (CHAT / GAMES) ===== */
+    .swipe-container {
+      flex: 1;
       display: flex;
+      overflow: hidden;
+      position: relative;
+      touch-action: pan-y;
+    }
+
+    .swipe-page {
+      min-width: 100%;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      will-change: transform;
+    }
+
+    .swipe-page.swiping {
+      transition: none;
+    }
+
+    .swipe-dots {
+      display: none;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 0;
+      padding-bottom: calc(6px + var(--safe-bottom));
       background: var(--header-bg);
       border-top: 1px solid var(--border);
-      padding: 4px 0;
-      padding-bottom: calc(4px + var(--safe-bottom));
     }
 
-    .chat-tab {
-      flex: 1;
-      display: flex; flex-direction: column; align-items: center;
-      gap: 2px;
-      padding: 6px 0;
-      border: none; background: none;
-      cursor: pointer;
-      color: var(--muted);
-      font-family: inherit;
-      font-size: 11px; font-weight: 500;
-      transition: color 0.2s;
+    .swipe-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      opacity: 0.3;
+      transition: opacity 0.25s, transform 0.25s;
     }
 
-    .chat-tab.active {
-      color: var(--accent);
+    .swipe-dot.active {
+      opacity: 1;
+      background: var(--accent);
+      transform: scale(1.3);
     }
-
-    .chat-tab svg {
-      transition: transform 0.15s;
-    }
-
-    .chat-tab:active svg { transform: scale(0.88); }
 
     /* ===== GAMES PAGE ===== */
     .games-page {

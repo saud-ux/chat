@@ -248,11 +248,14 @@
       if (srch) srch.remove();
       const rpicker = document.getElementById('reaction-picker');
       if (rpicker) rpicker.remove();
-      const tabBar = $('chat-tab-bar');
-      if (tabBar) tabBar.style.display = 'none';
-      const gp = $('games-page');
-      if (gp) gp.style.display = 'none';
+      const dots = $('swipe-dots');
+      if (dots) dots.style.display = 'none';
       currentTab = 'chat';
+      swipeGesturesAttached = false;
+      const cp = $('swipe-page-chat');
+      const gpp = $('swipe-page-games');
+      if (cp) cp.style.transform = '';
+      if (gpp) gpp.style.transform = '';
     }
 
     function addListener(ref, event, cb) {
@@ -389,22 +392,25 @@
           <span class="chat-header-status" id="chat-header-status"></span>
         </div>
         <div class="header-actions">
-          <button class="header-action-btn" onclick="switchTab(currentTab==='games'?'chat':'games')" aria-label="لعبة"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><path d="M17.32 5H6.68a4 4 0 00-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 003 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 019.828 16h4.344a2 2 0 011.414.586L17 18c.5.5 1 1 2 1a3 3 0 003-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0017.32 5z"/></svg></button>
+          <button class="header-action-btn" onclick="swipeTo(currentTab==='games'?'chat':'games')" aria-label="لعبة"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><path d="M17.32 5H6.68a4 4 0 00-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 003 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 019.828 16h4.344a2 2 0 011.414.586L17 18c.5.5 1 1 2 1a3 3 0 003-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0017.32 5z"/></svg></button>
           <button class="header-action-btn" onclick="toggleSearch()" aria-label="بحث"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
           <button class="header-action-btn" id="btn-theme" onclick="toggleTheme()" aria-label="الوضع">${isDark ? sunSvg : moonSvg}</button>
           <button class="header-action-btn" onclick="openSettings()" aria-label="إعدادات"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
           <button class="header-action-btn" onclick="forceUpdate(this)" aria-label="تحديث"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></button>
         </div>`;
 
-      const tabBar = $('chat-tab-bar');
-      if (tabBar) tabBar.style.display = 'flex';
+      const swipeDots = $('swipe-dots');
+      if (swipeDots) swipeDots.style.display = 'flex';
       currentTab = 'chat';
-      const chatTabBtn = $('tab-chat');
-      const gamesTabBtn = $('tab-games');
-      if (chatTabBtn) chatTabBtn.classList.add('active');
-      if (gamesTabBtn) gamesTabBtn.classList.remove('active');
-      const gamesPage = $('games-page');
-      if (gamesPage) gamesPage.style.display = 'none';
+      const cp2 = $('swipe-page-chat');
+      const gpp2 = $('swipe-page-games');
+      if (cp2) cp2.style.transform = '';
+      if (gpp2) gpp2.style.transform = '';
+      const dc = $('dot-chat');
+      const dg = $('dot-games');
+      if (dc) dc.classList.add('active');
+      if (dg) dg.classList.remove('active');
+      setupSwipeGestures();
 
       const area = $('messages-area');
       area.innerHTML = '';
@@ -2086,44 +2092,98 @@
        Stored as a 'game' message so both players share live state.
     ========================================================== */
     /* ==========================================================
-       TAB BAR: CHAT / GAMES
+       SWIPE PAGES: CHAT / GAMES
     ========================================================== */
     let currentTab = 'chat';
 
-    function switchTab(tab) {
-      if (tab === currentTab) return;
-      currentTab = tab;
+    function swipeTo(page) {
+      if (page === currentTab) return;
+      currentTab = page;
 
-      const chatTab = $('tab-chat');
-      const gamesTab = $('tab-games');
-      const messagesArea = $('messages-area');
-      const inputArea = $('input-area');
-      const gamesPage = $('games-page');
-      const scrollBtn = $('btn-scroll-bottom');
-      const typingInd = $('typing-indicator');
-      const editInd = $('edit-indicator');
-      const recordBar = $('record-bar');
-      const mediaPreview = $('media-preview');
+      const chatPage = $('swipe-page-chat');
+      const gamesPageEl = $('swipe-page-games');
+      const dotChat = $('dot-chat');
+      const dotGames = $('dot-games');
+      if (!chatPage || !gamesPageEl) return;
 
-      if (tab === 'games') {
-        chatTab.classList.remove('active');
-        gamesTab.classList.add('active');
-        messagesArea.style.display = 'none';
-        inputArea.style.display = 'none';
-        if (scrollBtn) scrollBtn.style.display = 'none';
-        if (typingInd) typingInd.style.display = 'none';
-        if (editInd) editInd.style.display = 'none';
-        if (recordBar) recordBar.style.display = 'none';
-        if (mediaPreview) mediaPreview.style.display = 'none';
-        gamesPage.style.display = 'flex';
-        renderGamesPage();
-      } else {
-        gamesTab.classList.remove('active');
-        chatTab.classList.add('active');
-        gamesPage.style.display = 'none';
-        messagesArea.style.display = 'flex';
-        inputArea.style.display = 'flex';
-      }
+      const dir = document.documentElement.dir === 'rtl' ? 1 : -1;
+      const offset = page === 'games' ? (dir * 100) : 0;
+
+      chatPage.style.transform = `translateX(${offset}%)`;
+      gamesPageEl.style.transform = `translateX(${offset}%)`;
+
+      if (dotChat) dotChat.classList.toggle('active', page === 'chat');
+      if (dotGames) dotGames.classList.toggle('active', page === 'games');
+
+      if (page === 'games') renderGamesPage();
+    }
+
+    function switchTab(tab) { swipeTo(tab); }
+
+    let swipeGesturesAttached = false;
+    function setupSwipeGestures() {
+      const container = $('swipe-container');
+      if (!container || swipeGesturesAttached) return;
+      swipeGesturesAttached = true;
+
+      let startX = 0, startY = 0, deltaX = 0, locked = false, isHorizontal = null;
+      const chatPage = $('swipe-page-chat');
+      const gamesPageEl = $('swipe-page-games');
+      const isRTL = document.documentElement.dir === 'rtl';
+
+      container.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        deltaX = 0;
+        locked = false;
+        isHorizontal = null;
+      }, { passive: true });
+
+      container.addEventListener('touchmove', (e) => {
+        if (e.touches.length !== 1 || locked) return;
+        const dx = e.touches[0].clientX - startX;
+        const dy = e.touches[0].clientY - startY;
+
+        if (isHorizontal === null) {
+          if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+          isHorizontal = Math.abs(dx) > Math.abs(dy);
+          if (!isHorizontal) { locked = true; return; }
+          chatPage.classList.add('swiping');
+          gamesPageEl.classList.add('swiping');
+        }
+
+        deltaX = dx;
+        const dir = isRTL ? 1 : -1;
+        const baseOffset = currentTab === 'games' ? (dir * 100) : 0;
+        const pxToPercent = (deltaX / container.offsetWidth) * 100;
+        const raw = baseOffset + pxToPercent;
+
+        const minVal = isRTL ? 0 : -100;
+        const maxVal = isRTL ? 100 : 0;
+        const clamped = Math.max(minVal, Math.min(maxVal, raw));
+
+        chatPage.style.transform = `translateX(${clamped}%)`;
+        gamesPageEl.style.transform = `translateX(${clamped}%)`;
+      }, { passive: true });
+
+      container.addEventListener('touchend', () => {
+        chatPage.classList.remove('swiping');
+        gamesPageEl.classList.remove('swiping');
+
+        if (!isHorizontal) return;
+
+        const threshold = container.offsetWidth * 0.25;
+        const swipeDir = isRTL ? deltaX : -deltaX;
+
+        if (swipeDir > threshold && currentTab === 'chat') {
+          swipeTo('games');
+        } else if (swipeDir < -threshold && currentTab === 'games') {
+          swipeTo('chat');
+        } else {
+          swipeTo(currentTab);
+        }
+      }, { passive: true });
     }
 
     function renderGamesPage() {
@@ -2131,22 +2191,22 @@
       const activeArea = $('games-active');
 
       grid.innerHTML = `
-        <div class="game-card" onclick="switchTab('chat');startXO()">
+        <div class="game-card" onclick="swipeTo('chat');startXO()">
           <span class="game-card-icon">⭕</span>
           <span class="game-card-name">إكس أو</span>
           <span class="game-card-desc">X vs O كلاسيكية</span>
         </div>
-        <div class="game-card" onclick="switchTab('chat');startRPS()">
+        <div class="game-card" onclick="swipeTo('chat');startRPS()">
           <span class="game-card-icon">✊</span>
           <span class="game-card-name">حجرة ورقة مقص</span>
           <span class="game-card-desc">اختر سلاحك!</span>
         </div>
-        <div class="game-card" onclick="switchTab('chat');startC4()">
+        <div class="game-card" onclick="swipeTo('chat');startC4()">
           <span class="game-card-icon">🔴</span>
           <span class="game-card-name">أربعة في خط</span>
           <span class="game-card-desc">صف 4 واربح</span>
         </div>
-        <div class="game-card" onclick="switchTab('chat');startGuess()">
+        <div class="game-card" onclick="swipeTo('chat');startGuess()">
           <span class="game-card-icon">🔢</span>
           <span class="game-card-name">خمّن الرقم</span>
           <span class="game-card-desc">1 إلى 100</span>
@@ -2190,7 +2250,7 @@
           }
 
           activeHtml += `
-            <div class="game-active-card" onclick="switchTab('chat');scrollToMessage('${key}')">
+            <div class="game-active-card" onclick="swipeTo('chat');scrollToMessage('${key}')">
               <span class="game-active-icon">${icon}</span>
               <div class="game-active-info">
                 <div class="game-active-name">${name}</div>
