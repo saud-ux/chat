@@ -248,6 +248,11 @@
       if (srch) srch.remove();
       const rpicker = document.getElementById('reaction-picker');
       if (rpicker) rpicker.remove();
+      const tabBar = $('chat-tab-bar');
+      if (tabBar) tabBar.style.display = 'none';
+      const gp = $('games-page');
+      if (gp) gp.style.display = 'none';
+      currentTab = 'chat';
     }
 
     function addListener(ref, event, cb) {
@@ -384,15 +389,28 @@
           <span class="chat-header-status" id="chat-header-status"></span>
         </div>
         <div class="header-actions">
-          <button class="header-action-btn" onclick="openGamePicker()" aria-label="لعبة"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><path d="M17.32 5H6.68a4 4 0 00-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 003 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 019.828 16h4.344a2 2 0 011.414.586L17 18c.5.5 1 1 2 1a3 3 0 003-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0017.32 5z"/></svg></button>
+          <button class="header-action-btn" onclick="switchTab(currentTab==='games'?'chat':'games')" aria-label="لعبة"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><path d="M17.32 5H6.68a4 4 0 00-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 003 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 019.828 16h4.344a2 2 0 011.414.586L17 18c.5.5 1 1 2 1a3 3 0 003-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0017.32 5z"/></svg></button>
           <button class="header-action-btn" onclick="toggleSearch()" aria-label="بحث"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
           <button class="header-action-btn" id="btn-theme" onclick="toggleTheme()" aria-label="الوضع">${isDark ? sunSvg : moonSvg}</button>
           <button class="header-action-btn" onclick="openSettings()" aria-label="إعدادات"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
           <button class="header-action-btn" onclick="forceUpdate(this)" aria-label="تحديث"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></button>
         </div>`;
 
+      const tabBar = $('chat-tab-bar');
+      if (tabBar) tabBar.style.display = 'flex';
+      currentTab = 'chat';
+      const chatTabBtn = $('tab-chat');
+      const gamesTabBtn = $('tab-games');
+      if (chatTabBtn) chatTabBtn.classList.add('active');
+      if (gamesTabBtn) gamesTabBtn.classList.remove('active');
+      const gamesPage = $('games-page');
+      if (gamesPage) gamesPage.style.display = 'none';
+
       const area = $('messages-area');
       area.innerHTML = '';
+      area.style.display = 'flex';
+      const inputAreaEl = $('input-area');
+      if (inputAreaEl) inputAreaEl.style.display = 'flex';
 
       area.addEventListener('scroll', () => {
         const distFromBottom = area.scrollHeight - area.scrollTop - area.clientHeight;
@@ -2067,6 +2085,125 @@
        IN-CHAT GAME: TIC-TAC-TOE (إكس أو)
        Stored as a 'game' message so both players share live state.
     ========================================================== */
+    /* ==========================================================
+       TAB BAR: CHAT / GAMES
+    ========================================================== */
+    let currentTab = 'chat';
+
+    function switchTab(tab) {
+      if (tab === currentTab) return;
+      currentTab = tab;
+
+      const chatTab = $('tab-chat');
+      const gamesTab = $('tab-games');
+      const messagesArea = $('messages-area');
+      const inputArea = $('input-area');
+      const gamesPage = $('games-page');
+      const scrollBtn = $('btn-scroll-bottom');
+      const typingInd = $('typing-indicator');
+      const editInd = $('edit-indicator');
+      const recordBar = $('record-bar');
+      const mediaPreview = $('media-preview');
+
+      if (tab === 'games') {
+        chatTab.classList.remove('active');
+        gamesTab.classList.add('active');
+        messagesArea.style.display = 'none';
+        inputArea.style.display = 'none';
+        if (scrollBtn) scrollBtn.style.display = 'none';
+        if (typingInd) typingInd.style.display = 'none';
+        if (editInd) editInd.style.display = 'none';
+        if (recordBar) recordBar.style.display = 'none';
+        if (mediaPreview) mediaPreview.style.display = 'none';
+        gamesPage.style.display = 'flex';
+        renderGamesPage();
+      } else {
+        gamesTab.classList.remove('active');
+        chatTab.classList.add('active');
+        gamesPage.style.display = 'none';
+        messagesArea.style.display = 'flex';
+        inputArea.style.display = 'flex';
+      }
+    }
+
+    function renderGamesPage() {
+      const grid = $('games-grid');
+      const activeArea = $('games-active');
+
+      grid.innerHTML = `
+        <div class="game-card" onclick="switchTab('chat');startXO()">
+          <span class="game-card-icon">⭕</span>
+          <span class="game-card-name">إكس أو</span>
+          <span class="game-card-desc">X vs O كلاسيكية</span>
+        </div>
+        <div class="game-card" onclick="switchTab('chat');startRPS()">
+          <span class="game-card-icon">✊</span>
+          <span class="game-card-name">حجرة ورقة مقص</span>
+          <span class="game-card-desc">اختر سلاحك!</span>
+        </div>
+        <div class="game-card" onclick="switchTab('chat');startC4()">
+          <span class="game-card-icon">🔴</span>
+          <span class="game-card-name">أربعة في خط</span>
+          <span class="game-card-desc">صف 4 واربح</span>
+        </div>
+        <div class="game-card" onclick="switchTab('chat');startGuess()">
+          <span class="game-card-icon">🔢</span>
+          <span class="game-card-name">خمّن الرقم</span>
+          <span class="game-card-desc">1 إلى 100</span>
+        </div>`;
+
+      let activeHtml = '<div class="games-section-title">الألعاب النشطة</div>';
+      const activeGames = allMsgElements.filter(m => m.msg.type === 'game' && !m.msg.deleted);
+
+      if (activeGames.length === 0) {
+        activeHtml += '<div class="games-empty">لا توجد ألعاب نشطة</div>';
+      } else {
+        activeHtml += '<div class="games-active-list">';
+        activeGames.slice().reverse().forEach(({ key, msg }) => {
+          const icon = msg.game === 'xo' ? '⭕' : msg.game === 'rps' ? '✊' : msg.game === 'c4' ? '🔴' : '🔢';
+          const name = msg.game === 'xo' ? 'إكس أو' : msg.game === 'rps' ? 'حجرة ورقة مقص' : msg.game === 'c4' ? 'أربعة في خط' : 'خمّن الرقم';
+          let status = '';
+          let badgeClass = '';
+          let badgeText = '';
+
+          if (msg.winner) {
+            badgeClass = 'done';
+            if (msg.winner === 'draw') { badgeText = 'تعادل'; }
+            else if (msg.winner === currentUser) { badgeText = 'فزت!'; }
+            else { badgeText = 'خسرت'; }
+            status = 'انتهت';
+          } else if (msg.game === 'rps') {
+            const myChoice = currentUser === msg.px ? msg.cx : msg.co;
+            if (myChoice) { badgeClass = 'waiting'; badgeText = 'بانتظاره'; status = 'اخترت'; }
+            else { badgeClass = 'your-turn'; badgeText = 'دورك'; status = 'اختر!'; }
+          } else if (msg.game === 'xo' || msg.game === 'c4') {
+            const myMark = currentUser === msg.px ? 'X' : 'O';
+            const isMyTurn = msg.turn === myMark;
+            if (isMyTurn) { badgeClass = 'your-turn'; badgeText = 'دورك'; }
+            else { badgeClass = 'waiting'; badgeText = 'بانتظاره'; }
+            status = msg.game === 'xo' ? 'إكس أو' : 'أربعة في خط';
+          } else if (msg.game === 'guess') {
+            const isSetter = msg.setter === currentUser;
+            if (!msg.setter) { badgeClass = 'your-turn'; badgeText = 'عيّن الرقم'; status = 'جديدة'; }
+            else if (isSetter) { badgeClass = 'waiting'; badgeText = 'بانتظاره'; status = 'يخمّن...'; }
+            else { badgeClass = 'your-turn'; badgeText = 'خمّن!'; status = 'خمّن الرقم'; }
+          }
+
+          activeHtml += `
+            <div class="game-active-card" onclick="switchTab('chat');scrollToMessage('${key}')">
+              <span class="game-active-icon">${icon}</span>
+              <div class="game-active-info">
+                <div class="game-active-name">${name}</div>
+                <div class="game-active-status">${status}</div>
+              </div>
+              <span class="game-active-badge ${badgeClass}">${badgeText}</span>
+            </div>`;
+        });
+        activeHtml += '</div>';
+      }
+      activeArea.innerHTML = activeHtml;
+    }
+
     function openGamePicker() {
       let html = '';
       html += actionBtn('⭕', 'react-icon', 'XO', `hideMsgActions();startXO()`);
