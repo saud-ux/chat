@@ -2872,17 +2872,28 @@
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
 
       if (window.PublicKeyCredential && localStorage.getItem('webauthn_cred')) {
-        authWithBiometric();
+        showFaceIdScreen();
         return;
       }
 
       showPinUI();
     }
 
+    function showFaceIdScreen() {
+      const overlay = $('pin-overlay');
+      overlay.style.display = 'flex';
+      overlay.innerHTML = '<div class="faceid-screen" id="faceid-tap"><div class="faceid-icon"><svg width="80" height="80" viewBox="0 0 96 96" fill="none"><rect x="4" y="4" width="24" height="16" rx="4" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><rect x="68" y="4" width="24" height="16" rx="4" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><rect x="4" y="76" width="24" height="16" rx="4" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><rect x="68" y="76" width="24" height="16" rx="4" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="36" cy="38" r="4" fill="currentColor"/><circle cx="60" cy="38" r="4" fill="currentColor"/><path d="M36 62c0 8 24 8 24 0" stroke="currentColor" stroke-width="4" stroke-linecap="round" fill="none"/><line x1="48" y1="44" x2="48" y2="56" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></div><div class="faceid-text">اضغط لتفعيل Face ID</div></div>';
+      const tap = $('faceid-tap');
+      tap.addEventListener('click', function() {
+        authWithBiometric();
+      }, { once: true });
+    }
+
     function showPinUI() {
-      $('pin-overlay').style.display = 'flex';
+      const overlay = $('pin-overlay');
+      overlay.innerHTML = '<div class="pin-box"><div class="pin-icon">🔒</div><div class="pin-title">أدخل رمز الدخول</div><div class="pin-subtitle">هذه الصفحة محمية برمز سري</div><input type="password" id="pin-input" class="pin-input" placeholder="••••••" dir="ltr" autocomplete="off" onkeydown="if(event.key===\'Enter\')checkPin()"><div id="pin-error" class="pin-error">رمز خاطئ، حاول مرة أخرى</div><button class="pin-btn" onclick="checkPin()">دخول</button><button class="pin-btn pin-btn-faceid" id="btn-faceid" onclick="authWithBiometric()" style="display:none">Face ID 🔓</button></div>';
+      overlay.style.display = 'flex';
       $('pin-error').style.display = 'none';
-      $('pin-input').value = '';
       const faceIdBtn = $('btn-faceid');
       if (faceIdBtn) faceIdBtn.style.display = localStorage.getItem('webauthn_cred') ? 'block' : 'none';
       setTimeout(() => $('pin-input').focus(), 100);

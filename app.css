@@ -990,6 +990,31 @@
       background: rgba(91,143,185,0.1);
     }
 
+    .faceid-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .faceid-icon {
+      color: var(--accent);
+      margin-bottom: 24px;
+      animation: faceid-pulse 2s ease-in-out infinite;
+    }
+    .faceid-text {
+      font-size: 18px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    @keyframes faceid-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.95); }
+    }
+
     @keyframes shake {
       0%, 100% { transform: translateX(0); }
       20%, 60% { transform: translateX(-10px); }
