@@ -2865,7 +2865,7 @@
        PIN PROTECTION
     ========================================================== */
     function isPinVerified() {
-      return localStorage.getItem('pin_verified') === 'true';
+      return sessionStorage.getItem('pin_verified') === 'true';
     }
 
     function showPinOverlay() {
@@ -2901,7 +2901,7 @@
           timeout: 60000
         }
       }).then(() => {
-        localStorage.setItem('pin_verified', 'true');
+        sessionStorage.setItem('pin_verified', 'true');
         $('pin-overlay').style.display = 'none';
         route();
       }).catch(() => {
@@ -2936,7 +2936,7 @@
     function checkPin() {
       const input = $('pin-input');
       if (input.value === PIN_CODE) {
-        localStorage.setItem('pin_verified', 'true');
+        sessionStorage.setItem('pin_verified', 'true');
         $('pin-overlay').style.display = 'none';
         if (window.PublicKeyCredential && !localStorage.getItem('webauthn_cred')) {
           setTimeout(() => {
