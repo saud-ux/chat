@@ -2873,7 +2873,64 @@
       $('pin-overlay').style.display = 'flex';
       $('pin-error').style.display = 'none';
       $('pin-input').value = '';
-      setTimeout(() => $('pin-input').focus(), 100);
+      const faceIdBtn = $('btn-faceid');
+      if (faceIdBtn) faceIdBtn.style.display = 'none';
+
+      if (window.PublicKeyCredential) {
+        const credId = localStorage.getItem('webauthn_cred');
+        if (credId) {
+          if (faceIdBtn) faceIdBtn.style.display = 'block';
+          authWithBiometric();
+        } else {
+          setTimeout(() => $('pin-input').focus(), 100);
+        }
+      } else {
+        setTimeout(() => $('pin-input').focus(), 100);
+      }
+    }
+
+    function authWithBiometric() {
+      const credId = localStorage.getItem('webauthn_cred');
+      if (!credId) return;
+      const id = Uint8Array.from(atob(credId), c => c.charCodeAt(0));
+      navigator.credentials.get({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          allowCredentials: [{ id, type: 'public-key', transports: ['internal'] }],
+          userVerification: 'required',
+          timeout: 60000
+        }
+      }).then(() => {
+        localStorage.setItem('pin_verified', 'true');
+        $('pin-overlay').style.display = 'none';
+        route();
+      }).catch(() => {
+        setTimeout(() => $('pin-input').focus(), 100);
+      });
+    }
+
+    function registerBiometric() {
+      if (!window.PublicKeyCredential) { miniToast('جهازك لا يدعم Face ID'); return; }
+      const userId = crypto.getRandomValues(new Uint8Array(16));
+      navigator.credentials.create({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          rp: { name: 'رسائل', id: window.location.hostname },
+          user: { id: userId, name: 'saud', displayName: 'سعود' },
+          pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            userVerification: 'required'
+          },
+          timeout: 60000
+        }
+      }).then(cred => {
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+        localStorage.setItem('webauthn_cred', b64);
+        miniToast('تم تفعيل Face ID ✓');
+      }).catch(() => {
+        miniToast('فشل تسجيل Face ID');
+      });
     }
 
     function checkPin() {
@@ -2881,6 +2938,11 @@
       if (input.value === PIN_CODE) {
         localStorage.setItem('pin_verified', 'true');
         $('pin-overlay').style.display = 'none';
+        if (window.PublicKeyCredential && !localStorage.getItem('webauthn_cred')) {
+          setTimeout(() => {
+            if (confirm('تبغا تفعّل Face ID للدخول السريع؟')) registerBiometric();
+          }, 500);
+        }
         route();
       } else {
         $('pin-error').style.display = 'block';

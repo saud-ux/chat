@@ -117,6 +117,7 @@
         <input type="password" id="pin-input" class="pin-input" placeholder="••••••" dir="ltr" autocomplete="off" onkeydown="if(event.key==='Enter')checkPin()">
         <div id="pin-error" class="pin-error">رمز خاطئ، حاول مرة أخرى</div>
         <button class="pin-btn" onclick="checkPin()">دخول</button>
+        <button class="pin-btn pin-btn-faceid" id="btn-faceid" onclick="authWithBiometric()" style="display:none">Face ID 🔓</button>
       </div>
     </div>
   </div>

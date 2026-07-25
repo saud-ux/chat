@@ -980,6 +980,16 @@
       background: var(--accent-dark);
     }
 
+    .pin-btn-faceid {
+      background: transparent;
+      color: var(--accent);
+      border: 2px solid var(--accent);
+      margin-top: 10px;
+    }
+    .pin-btn-faceid:active {
+      background: rgba(91,143,185,0.1);
+    }
+
     @keyframes shake {
       0%, 100% { transform: translateX(0); }
       20%, 60% { transform: translateX(-10px); }
