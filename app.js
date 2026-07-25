@@ -2870,28 +2870,27 @@
 
     function showPinOverlay() {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+      if (window.PublicKeyCredential && localStorage.getItem('webauthn_cred')) {
+        authWithBiometric();
+        return;
+      }
+
+      showPinUI();
+    }
+
+    function showPinUI() {
       $('pin-overlay').style.display = 'flex';
       $('pin-error').style.display = 'none';
       $('pin-input').value = '';
       const faceIdBtn = $('btn-faceid');
-      if (faceIdBtn) faceIdBtn.style.display = 'none';
-
-      if (window.PublicKeyCredential) {
-        const credId = localStorage.getItem('webauthn_cred');
-        if (credId) {
-          if (faceIdBtn) faceIdBtn.style.display = 'block';
-          authWithBiometric();
-        } else {
-          setTimeout(() => $('pin-input').focus(), 100);
-        }
-      } else {
-        setTimeout(() => $('pin-input').focus(), 100);
-      }
+      if (faceIdBtn) faceIdBtn.style.display = localStorage.getItem('webauthn_cred') ? 'block' : 'none';
+      setTimeout(() => $('pin-input').focus(), 100);
     }
 
     function authWithBiometric() {
       const credId = localStorage.getItem('webauthn_cred');
-      if (!credId) return;
+      if (!credId) { showPinUI(); return; }
       const id = Uint8Array.from(atob(credId), c => c.charCodeAt(0));
       navigator.credentials.get({
         publicKey: {
@@ -2905,7 +2904,7 @@
         $('pin-overlay').style.display = 'none';
         route();
       }).catch(() => {
-        setTimeout(() => $('pin-input').focus(), 100);
+        showPinUI();
       });
     }
 
