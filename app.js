@@ -57,7 +57,7 @@
     };
 
     const VAPID_PUBLIC_KEY = 'BOIMSoH3ZuHz_eL09w-2cOw7FSGyTTew3q3XlJsuwe4yBvnEbi1ee3mnwz3hOvS4rA_SigRsest_GbV_KgLZPV8';
-    const PIN_CODE = 'SAUD_51152';
+    const PIN_CODE = 's';
 
     const AVATARS = {
       w: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#5B8FB9"/><text x="24" y="31" text-anchor="middle" fill="#fff" font-size="22" font-weight="700" font-family="Arial, sans-serif">W</text></svg>',
