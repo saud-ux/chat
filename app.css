@@ -1426,7 +1426,7 @@
     .twenty-game { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 200px; }
     .twenty-rule { font-size: 12px; color: var(--muted); opacity: 0.8; }
     .message-mine .twenty-rule { color: rgba(255,255,255,0.7); }
-    .twenty-hist { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: 240px; }
+    .twenty-hist { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-start; max-width: 260px; direction: ltr; }
     .twenty-chip {
       padding: 3px 10px; border-radius: 12px; font-size: 14px; font-weight: 600; direction: ltr;
     }
