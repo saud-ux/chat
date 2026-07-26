@@ -57,7 +57,6 @@
     };
 
     const VAPID_PUBLIC_KEY = 'BOIMSoH3ZuHz_eL09w-2cOw7FSGyTTew3q3XlJsuwe4yBvnEbi1ee3mnwz3hOvS4rA_SigRsest_GbV_KgLZPV8';
-    const PIN_CODE = 's';
 
     const AVATARS = {
       w: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#5B8FB9"/><text x="24" y="31" text-anchor="middle" fill="#fff" font-size="22" font-weight="700" font-family="Arial, sans-serif">W</text></svg>',
@@ -148,12 +147,6 @@
         appleTitleMeta.content = 'رسائل';
       }
 
-      // PIN protection for Saud's routes
-      if (APP_USER === 'saud' && !isPinVerified()) {
-        showPinOverlay();
-        return;
-      }
-      $('pin-overlay').style.display = 'none';
 
       if (APP_USER === 'saud') {
         if (path === '/chat/w') {
@@ -2858,107 +2851,6 @@
       if (status) {
         status.textContent = online ? 'متصل الآن' : '';
         status.classList.toggle('online', !!online);
-      }
-    }
-
-    /* ==========================================================
-       PIN PROTECTION
-    ========================================================== */
-    function isPinVerified() {
-      return sessionStorage.getItem('pin_verified') === 'true';
-    }
-
-    function showPinOverlay() {
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-
-      if (window.PublicKeyCredential && localStorage.getItem('webauthn_cred')) {
-        showFaceIdScreen();
-        return;
-      }
-
-      showPinUI();
-    }
-
-    function showFaceIdScreen() {
-      const overlay = $('pin-overlay');
-      overlay.style.display = 'flex';
-      overlay.innerHTML = '<div class="faceid-screen"><div class="faceid-tap-area" id="faceid-tap"><div class="faceid-icon"><svg width="80" height="80" viewBox="0 0 96 96" fill="none"><rect x="4" y="4" width="24" height="16" rx="4" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><rect x="68" y="4" width="24" height="16" rx="4" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><rect x="4" y="76" width="24" height="16" rx="4" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><rect x="68" y="76" width="24" height="16" rx="4" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="36" cy="38" r="4" fill="currentColor"/><circle cx="60" cy="38" r="4" fill="currentColor"/><path d="M36 62c0 8 24 8 24 0" stroke="currentColor" stroke-width="4" stroke-linecap="round" fill="none"/><line x1="48" y1="44" x2="48" y2="56" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></div><div class="faceid-text">اضغط لتفعيل Face ID</div></div><div class="faceid-divider"><span>أو</span></div><div class="faceid-pin-area"><input type="password" id="pin-input" class="pin-input" placeholder="الرمز" dir="ltr" autocomplete="off" onkeydown="if(event.key===\'Enter\')checkPin()"><div id="pin-error" class="pin-error">رمز خاطئ، حاول مرة أخرى</div><button class="pin-btn" onclick="checkPin()">دخول</button></div></div>';
-      $('pin-error').style.display = 'none';
-      $('faceid-tap').addEventListener('click', function() {
-        authWithBiometric();
-      }, { once: true });
-    }
-
-    function showPinUI() {
-      const overlay = $('pin-overlay');
-      overlay.innerHTML = '<div class="pin-box"><div class="pin-icon">🔒</div><div class="pin-title">أدخل رمز الدخول</div><div class="pin-subtitle">هذه الصفحة محمية برمز سري</div><input type="password" id="pin-input" class="pin-input" placeholder="••••••" dir="ltr" autocomplete="off" onkeydown="if(event.key===\'Enter\')checkPin()"><div id="pin-error" class="pin-error">رمز خاطئ، حاول مرة أخرى</div><button class="pin-btn" onclick="checkPin()">دخول</button><button class="pin-btn pin-btn-faceid" id="btn-faceid" onclick="authWithBiometric()" style="display:none">Face ID 🔓</button></div>';
-      overlay.style.display = 'flex';
-      $('pin-error').style.display = 'none';
-      const faceIdBtn = $('btn-faceid');
-      if (faceIdBtn) faceIdBtn.style.display = localStorage.getItem('webauthn_cred') ? 'block' : 'none';
-      setTimeout(() => $('pin-input').focus(), 100);
-    }
-
-    function authWithBiometric() {
-      const credId = localStorage.getItem('webauthn_cred');
-      if (!credId) { showPinUI(); return; }
-      const id = Uint8Array.from(atob(credId), c => c.charCodeAt(0));
-      navigator.credentials.get({
-        publicKey: {
-          challenge: crypto.getRandomValues(new Uint8Array(32)),
-          allowCredentials: [{ id, type: 'public-key', transports: ['internal'] }],
-          userVerification: 'required',
-          timeout: 60000
-        }
-      }).then(() => {
-        sessionStorage.setItem('pin_verified', 'true');
-        $('pin-overlay').style.display = 'none';
-        route();
-      }).catch(() => {
-        showPinUI();
-      });
-    }
-
-    function registerBiometric() {
-      if (!window.PublicKeyCredential) { miniToast('جهازك لا يدعم Face ID'); return; }
-      const userId = crypto.getRandomValues(new Uint8Array(16));
-      navigator.credentials.create({
-        publicKey: {
-          challenge: crypto.getRandomValues(new Uint8Array(32)),
-          rp: { name: 'رسائل', id: window.location.hostname },
-          user: { id: userId, name: 'saud', displayName: 'سعود' },
-          pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            userVerification: 'required'
-          },
-          timeout: 60000
-        }
-      }).then(cred => {
-        const b64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
-        localStorage.setItem('webauthn_cred', b64);
-        miniToast('تم تفعيل Face ID ✓');
-      }).catch(() => {
-        miniToast('فشل تسجيل Face ID');
-      });
-    }
-
-    function checkPin() {
-      const input = $('pin-input');
-      if (input.value === PIN_CODE) {
-        sessionStorage.setItem('pin_verified', 'true');
-        $('pin-overlay').style.display = 'none';
-        if (window.PublicKeyCredential && !localStorage.getItem('webauthn_cred')) {
-          setTimeout(() => {
-            if (confirm('تبغا تفعّل Face ID للدخول السريع؟')) registerBiometric();
-          }, 500);
-        }
-        route();
-      } else {
-        $('pin-error').style.display = 'block';
-        input.value = '';
-        input.classList.add('shake');
-        setTimeout(() => input.classList.remove('shake'), 500);
       }
     }
 

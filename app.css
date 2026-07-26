@@ -902,166 +902,6 @@
       40% { opacity: 1; transform: scale(1); }
     }
 
-    /* ===== PIN OVERLAY ===== */
-    .pin-overlay {
-      position: fixed;
-      inset: 0;
-      background: #fff;
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .pin-box {
-      text-align: center;
-      padding: 24px;
-      max-width: 320px;
-      width: 100%;
-    }
-
-    .pin-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-    }
-
-    .pin-title {
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 8px;
-      color: #1a1a1a;
-    }
-
-    .pin-subtitle {
-      font-size: 14px;
-      color: var(--muted);
-      margin-bottom: 24px;
-    }
-
-    .pin-input {
-      width: 100%;
-      padding: 14px;
-      font-size: 18px;
-      text-align: center;
-      border: 2px solid var(--border);
-      border-radius: 12px;
-      outline: none;
-      font-family: inherit;
-      letter-spacing: 4px;
-      direction: ltr;
-    }
-
-    .pin-input:focus {
-      border-color: var(--accent);
-    }
-
-    .pin-error {
-      color: var(--badge);
-      font-size: 13px;
-      margin-top: 12px;
-      display: none;
-    }
-
-    .pin-btn {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      width: 100%;
-      padding: 14px;
-      font-size: 16px;
-      border-radius: 12px;
-      cursor: pointer;
-      font-family: inherit;
-      font-weight: 600;
-      margin-top: 16px;
-    }
-
-    .pin-btn:active {
-      background: var(--accent-dark);
-    }
-
-    .pin-btn-faceid {
-      background: transparent;
-      color: var(--accent);
-      border: 2px solid var(--accent);
-      margin-top: 10px;
-    }
-    .pin-btn-faceid:active {
-      background: rgba(91,143,185,0.1);
-    }
-
-    .faceid-screen {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      height: 100%;
-      padding: 24px;
-    }
-    .faceid-tap-area {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      padding: 32px;
-    }
-    .faceid-icon {
-      color: var(--accent);
-      margin-bottom: 24px;
-      animation: faceid-pulse 2s ease-in-out infinite;
-    }
-    .faceid-text {
-      font-size: 18px;
-      color: var(--muted);
-      font-weight: 500;
-    }
-    .faceid-divider {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      max-width: 280px;
-      margin: 20px 0;
-      gap: 12px;
-    }
-    .faceid-divider::before,
-    .faceid-divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-    .faceid-divider span {
-      font-size: 14px;
-      color: var(--muted);
-    }
-    .faceid-pin-area {
-      width: 100%;
-      max-width: 280px;
-    }
-    .faceid-pin-area .pin-input {
-      margin-bottom: 0;
-    }
-    .faceid-pin-area .pin-btn {
-      margin-top: 12px;
-    }
-    @keyframes faceid-pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(0.95); }
-    }
-
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      20%, 60% { transform: translateX(-10px); }
-      40%, 80% { transform: translateX(10px); }
-    }
-
-    .pin-input.shake {
-      animation: shake 0.5s;
-      border-color: var(--badge);
-    }
-
     /* ===== DARK MODE ===== */
     :root[data-theme="dark"] {
       --bg: #111b21; --chat-bg: #0b141a; --my-bubble: #005c4b; --my-text: #e9edef;
@@ -1071,7 +911,6 @@
     :root[data-theme="dark"] body { color: #e9edef; }
     :root[data-theme="dark"] .app-wrap { background: var(--bg); }
     :root[data-theme="dark"] .home-title,
-    :root[data-theme="dark"] .pin-title,
     :root[data-theme="dark"] .setup-msg h2 { color: #e9edef; }
     :root[data-theme="dark"] .chat-card:active { background: #2a3942; }
     :root[data-theme="dark"] .msg-action-btn:active { background: rgba(255,255,255,0.08); }
@@ -1093,8 +932,6 @@
     :root[data-theme="dark"] .msg-action-btn { color: #e9edef; }
     :root[data-theme="dark"] .msg-action-btn:active { background: rgba(255,255,255,0.08); }
     :root[data-theme="dark"] .msg-actions-overlay.visible { background: rgba(0,0,0,0.35); }
-    :root[data-theme="dark"] .pin-overlay { background: var(--bg); }
-    :root[data-theme="dark"] .pin-input { background: #2a3942; color: #e9edef; border-color: var(--border); }
     :root[data-theme="dark"] .edit-indicator { background: #2a3942; color: #fcd34d; }
     :root[data-theme="dark"] .btn-cancel-edit { color: #fcd34d; }
     :root[data-theme="dark"] .date-separator span { background: rgba(32,44,51,0.9); }
