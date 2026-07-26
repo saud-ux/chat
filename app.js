@@ -2665,10 +2665,17 @@
           status = `دورك ✋ (الحين عند ${count})`;
           const canOne = count + 1 <= 20;
           const canTwo = count + 2 <= 20;
+          let hint = '';
+          if (APP_USER === 'saud') {
+            const r = count % 3;
+            if (r === 0) hint = '<div class="twenty-hint">💡 اختر +١</div>';
+            else if (r === 2) hint = '<div class="twenty-hint">💡 اختر +٢</div>';
+            else hint = '<div class="twenty-hint">⚠️ موقف صعب، اختار أي واحد</div>';
+          }
           body = hist + `<div class="twenty-btns">` +
             (canOne ? `<button class="twenty-btn" onclick="twentyPlay('${k}',1)">+١<span class="twenty-btn-sub">${count + 1}</span></button>` : '') +
             (canTwo ? `<button class="twenty-btn" onclick="twentyPlay('${k}',2)">+٢<span class="twenty-btn-sub">${count + 1}, ${count + 2}</span></button>` : '') +
-            `</div>`;
+            `</div>` + hint;
         } else {
           status = `دور الطرف الثاني… (عند ${count})`;
           body = hist;
