@@ -403,7 +403,7 @@
       if (msg.type === 'gif') return '🎞️ GIF';
       if (msg.type === 'video') return '🎥 فيديو';
       if (msg.type === 'audio') return '🎤 رسالة صوتية';
-      if (msg.type === 'game') return msg.game === 'rps' ? '🎮 حجرة ورقة مقص' : msg.game === 'c4' ? '🎮 أربعة في خط' : msg.game === 'guess' ? '🎮 خمّن الرقم' : '🎮 لعبة إكس أو';
+      if (msg.type === 'game') return msg.game === 'rps' ? '🎮 حجرة ورقة مقص' : msg.game === 'c4' ? '🎮 أربعة في خط' : msg.game === 'guess' ? '🎮 خمّن الرقم' : msg.game === 'twenty' ? '🎮 الرقم ٢٠' : '🎮 لعبة إكس أو';
       return msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
     }
 
@@ -1802,6 +1802,7 @@
         content = msg.game === 'rps' ? renderRPS(msg, el.dataset.key)
           : msg.game === 'c4' ? renderC4(msg, el.dataset.key)
           : msg.game === 'guess' ? renderGuess(msg, el.dataset.key)
+          : msg.game === 'twenty' ? renderTwenty(msg, el.dataset.key)
           : renderXO(msg, el.dataset.key);
       } else {
         const ec = emojiOnlyCount(msg.content);
@@ -2239,6 +2240,7 @@
       else if (gameType === 'rps') startRPS();
       else if (gameType === 'c4') startC4();
       else if (gameType === 'guess') startGuess();
+      else if (gameType === 'twenty') startTwenty();
     }
 
     function stopActiveGame() {
@@ -2273,6 +2275,7 @@
         if (msg.game === 'rps') html = renderRPS(msg, gameKey);
         else if (msg.game === 'c4') html = renderC4(msg, gameKey);
         else if (msg.game === 'guess') html = renderGuess(msg, gameKey);
+        else if (msg.game === 'twenty') html = renderTwenty(msg, gameKey);
         else html = renderXO(msg, gameKey);
         const partnerName = CONTACTS[msg.px === currentUser ? msg.po : msg.px]?.name || '';
         activeArea.innerHTML = `<div class="game-active-card">
@@ -2342,6 +2345,11 @@
           <span class="game-card-icon">🔢</span>
           <span class="game-card-name">خمّن الرقم</span>
           <span class="game-card-desc">1 إلى 100</span>
+        </div>
+        <div class="game-card" onclick="pickPartnerForGame('twenty')">
+          <span class="game-card-icon">2️⃣0️⃣</span>
+          <span class="game-card-name">الرقم ٢٠</span>
+          <span class="game-card-desc">الي يقول ٢٠ يخسر!</span>
         </div>`;
 
       if (!activeGameRef) activeArea.innerHTML = '';
@@ -2353,6 +2361,7 @@
       html += actionBtn('✊', 'react-icon', 'حجرة', `hideMsgActions();startRPS()`);
       html += actionBtn('🔴', 'react-icon', 'أربعة', `hideMsgActions();startC4()`);
       html += actionBtn('🔢', 'react-icon', 'خمّن', `hideMsgActions();startGuess()`);
+      html += actionBtn('2️⃣0️⃣', 'react-icon', '٢٠', `hideMsgActions();startTwenty()`);
       const panel = $('msg-actions-content');
       panel.innerHTML = html;
       const overlay = $('msg-actions-overlay');
@@ -2589,6 +2598,83 @@
         body = hist + `<div class="guess-input"><input type="number" min="1" max="100" inputmode="numeric" class="guess-field" id="gg-${k}"><button class="guess-btn" onclick="guessNum('${k}',document.getElementById('gg-${k}').value)">خمّن</button></div>`;
       } else { status = 'لعبة جارية…'; body = hist; }
       return `<div class="guess-game${done ? ' xo-done' : ''}"><div class="xo-title">🔢 خمّن الرقم</div><div class="xo-status">${escapeHtml(status)}</div>${body}</div>`;
+    }
+
+    /* ---- Count to 20 (الرقم ٢٠): say 20 and you lose ---- */
+    function startTwenty() {
+      if (!currentChatId || !currentUser || !db) return;
+      db.ref(`chats/${currentChatId}/messages`).push({
+        sender: currentUser, type: 'game', game: 'twenty',
+        px: currentUser, po: gameOther(),
+        count: 0, turn: 'X', winner: '',
+        history: '',
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+      sendPush(currentChatId, '🎮 بدأ لعبة الرقم ٢٠');
+    }
+
+    function twentyPlay(key, amount) {
+      if (!currentChatId || !db) return;
+      const ref = db.ref(`chats/${currentChatId}/messages/${key}`);
+      ref.once('value', snap => {
+        const g = snap.val();
+        if (!g || g.game !== 'twenty' || g.winner) return;
+        const myMark = g.px === currentUser ? 'X' : (g.po === currentUser ? 'O' : null);
+        if (!myMark || myMark !== g.turn) return;
+        const cur = g.count || 0;
+        const newCount = cur + amount;
+        const nums = [];
+        for (let i = cur + 1; i <= Math.min(newCount, 20); i++) nums.push(i);
+        const entry = myMark + ':' + nums.join('-');
+        const history = g.history ? g.history + ',' + entry : entry;
+        const update = { count: newCount, history, turn: g.turn === 'X' ? 'O' : 'X' };
+        if (newCount >= 20) update.winner = myMark;
+        ref.update(update);
+        if (navigator.vibrate) navigator.vibrate(10);
+        if (newCount >= 20) sendPush(currentChatId, '🎮 انتهت لعبة الرقم ٢٠');
+      });
+    }
+
+    function renderTwenty(msg, key) {
+      const meMark = msg.px === currentUser ? 'X' : (msg.po === currentUser ? 'O' : '');
+      const count = msg.count || 0;
+      const done = !!msg.winner;
+      const k = escapeAttr(key);
+      const entries = (msg.history || '').split(',').filter(Boolean);
+      let hist = '';
+      if (entries.length) {
+        hist = '<div class="twenty-hist">';
+        entries.forEach(e => {
+          const parts = e.split(':');
+          const player = parts[0];
+          const nums = parts[1];
+          const isMe = player === meMark;
+          hist += `<span class="twenty-chip ${isMe ? 'twenty-mine' : 'twenty-theirs'}">${nums.replace(/-/g, ', ')}</span>`;
+        });
+        hist += '</div>';
+      }
+      let status, body = '';
+      if (done) {
+        const loserMark = msg.winner;
+        status = meMark ? (loserMark === meMark ? 'خسرت! قلت ٢٠ 😅' : 'فزت! 🎉') : '';
+        body = hist;
+      } else {
+        const turnUser = msg.turn === 'X' ? msg.px : msg.po;
+        const myTurn = turnUser === currentUser;
+        if (myTurn) {
+          status = `دورك ✋ (الحين عند ${count})`;
+          const canOne = count + 1 <= 20;
+          const canTwo = count + 2 <= 20;
+          body = hist + `<div class="twenty-btns">` +
+            (canOne ? `<button class="twenty-btn" onclick="twentyPlay('${k}',1)">+١<span class="twenty-btn-sub">${count + 1}</span></button>` : '') +
+            (canTwo ? `<button class="twenty-btn" onclick="twentyPlay('${k}',2)">+٢<span class="twenty-btn-sub">${count + 1}, ${count + 2}</span></button>` : '') +
+            `</div>`;
+        } else {
+          status = `دور الطرف الثاني… (عند ${count})`;
+          body = hist;
+        }
+      }
+      return `<div class="twenty-game${done ? ' xo-done' : ''}"><div class="xo-title">2️⃣0️⃣ الرقم ٢٠</div><div class="twenty-rule">الي يقول ٢٠ يخسر!</div>${body}<div class="xo-status">${escapeHtml(status)}</div></div>`;
     }
 
     function xoWinnerOf(b) {

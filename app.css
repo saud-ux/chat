@@ -1421,3 +1421,27 @@
     .guess-hist { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: 230px; }
     .guess-chip { background: rgba(0,0,0,0.1); padding: 2px 9px; border-radius: 11px; font-size: 13px; direction: ltr; }
     .message-mine .guess-chip { background: rgba(255,255,255,0.22); }
+
+    /* ===== Count to 20 (الرقم ٢٠) ===== */
+    .twenty-game { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 200px; }
+    .twenty-rule { font-size: 12px; color: var(--muted); opacity: 0.8; }
+    .message-mine .twenty-rule { color: rgba(255,255,255,0.7); }
+    .twenty-hist { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: 240px; }
+    .twenty-chip {
+      padding: 3px 10px; border-radius: 12px; font-size: 14px; font-weight: 600; direction: ltr;
+    }
+    .twenty-mine { background: rgba(108,92,231,0.2); color: #6C5CE7; }
+    .twenty-theirs { background: rgba(0,0,0,0.08); color: #555; }
+    .message-mine .twenty-mine { background: rgba(255,255,255,0.25); color: #fff; }
+    .message-mine .twenty-theirs { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.75); }
+    :root[data-theme="dark"] .twenty-theirs { background: rgba(255,255,255,0.1); color: #aaa; }
+    :root[data-theme="dark"] .twenty-mine { background: rgba(108,92,231,0.35); color: #a29bfe; }
+    .twenty-btns { display: flex; gap: 8px; margin-top: 4px; }
+    .twenty-btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 12px;
+      padding: 10px 18px; font-size: 18px; font-weight: 700; cursor: pointer;
+      font-family: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      min-width: 70px; transition: transform 0.12s;
+    }
+    .twenty-btn:active { transform: scale(0.92); }
+    .twenty-btn-sub { font-size: 11px; font-weight: 500; opacity: 0.8; }
