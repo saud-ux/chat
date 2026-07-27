@@ -280,6 +280,7 @@
       searchOpen = false;
       allMsgElements = [];
       knownReactions = {};
+      allForceSeen = false;
       currentWallpaper = null;
       ensureAllLoaded = null;
       requestLoadOlder = null;
@@ -710,6 +711,7 @@
           area.appendChild(sep);
         }
         area.appendChild(buildMsgEl(key, msg));
+        if (isMine) allForceSeen = false;
         updateSeenIndicator();
 
         if (!isMine && !isFirstLoad[chatId]) {
@@ -793,6 +795,7 @@
         if (isTyping) {
           indicator.style.display = 'flex';
           scrollToBottom(true);
+          markAllAsSeen();
         } else {
           indicator.style.display = 'none';
         }
@@ -2899,11 +2902,18 @@
     const TICK_SINGLE = '<svg viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5L6 10.5L13 2.5"/></svg>';
     const TICK_DOUBLE = '<svg viewBox="0 0 22 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6.5L5 10.5L12 2.5"/><path d="M8 6.5L12 10.5L19 2.5"/></svg>';
 
+    let allForceSeen = false;
+
+    function markAllAsSeen() {
+      allForceSeen = true;
+      updateSeenIndicator();
+    }
+
     function updateSeenIndicator() {
       myMessages.forEach(m => {
         const s = m.el.querySelector('.msg-status');
         if (!s) return;
-        const seen = otherSeenTimestamp && m.timestamp <= otherSeenTimestamp;
+        const seen = allForceSeen || (otherSeenTimestamp && m.timestamp <= otherSeenTimestamp);
         if (seen) {
           if (!s.classList.contains('seen')) { s.classList.add('seen'); s.innerHTML = TICK_DOUBLE; }
         } else if (s.classList.contains('seen')) {
