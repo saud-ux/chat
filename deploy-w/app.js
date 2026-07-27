@@ -394,7 +394,7 @@
       const ref = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp');
       const startRef = lastRead ? ref.startAt(lastRead + 1) : ref;
 
-      addListener(startRef, 'value', snap => {
+      startRef.once('value', snap => {
         let count = 0;
         snap.forEach(child => {
           if (child.val().sender !== user) count++;
@@ -407,6 +407,23 @@
         }
         updateTitleBadge();
       });
+
+      const liveRef = lastRead ? ref.startAt(lastRead + 1) : ref.limitToLast(1);
+      let initial = true;
+      addListener(liveRef, 'child_added', snap => {
+        if (initial) return;
+        const msg = snap.val();
+        if (msg.sender !== user) {
+          totalUnread[chatId] = (totalUnread[chatId] || 0) + 1;
+          const badge = $(`badge-${chatId}`);
+          if (badge) {
+            badge.textContent = totalUnread[chatId];
+            badge.classList.toggle('hidden', totalUnread[chatId] === 0);
+          }
+          updateTitleBadge();
+        }
+      });
+      startRef.once('value', () => { initial = false; });
     }
 
     function listenForHomeNotifications(user, partners) {
@@ -689,51 +706,70 @@
       ensureAllLoaded = loadAllOlder;
 
       // Load newer messages that arrive after the initial window.
-      function handleNewMessage(key, msg) {
-        if (renderedKeys.has(key)) return;
-        renderedKeys.add(key);
-        const isMine = msg.sender === user;
+      // Batches rapid-fire arrivals (e.g. after reconnect) so the DOM settles
+      // once instead of reflowing per-message.
+      let newMsgFlushTimer = null;
+      let newMsgQueue = [];
+
+      function flushNewMessages() {
+        newMsgFlushTimer = null;
+        if (!newMsgQueue.length) return;
+        const batch = newMsgQueue.slice();
+        newMsgQueue = [];
+
         const wasNearBottom = area
           ? (area.scrollHeight - area.scrollTop - area.clientHeight) < 150
           : true;
-        loaded.push({ key, msg });
-        newestLoadedTs = msg.timestamp;
-        if (oldestLoadedTs == null) oldestLoadedTs = msg.timestamp;
 
-        // If the list was emptied (e.g. by clearChat), force a fresh separator.
-        if (!area.querySelector('.message')) lastDateStr = '';
-        const dateStr = dateStrOf(msg.timestamp);
-        if (dateStr !== lastDateStr) {
-          lastDateStr = dateStr;
-          const sep = document.createElement('div');
-          sep.className = 'date-separator';
-          sep.innerHTML = `<span>${dateStr}</span>`;
-          area.appendChild(sep);
-        }
-        area.appendChild(buildMsgEl(key, msg));
-        if (isMine) allForceSeen = false;
+        let hasOther = false;
+        let lastOtherMsg = null;
+        batch.forEach(({ key, msg }) => {
+          const isMine = msg.sender === user;
+          loaded.push({ key, msg });
+          newestLoadedTs = msg.timestamp;
+          if (oldestLoadedTs == null) oldestLoadedTs = msg.timestamp;
+
+          if (!area.querySelector('.message')) lastDateStr = '';
+          const dateStr = dateStrOf(msg.timestamp);
+          if (dateStr !== lastDateStr) {
+            lastDateStr = dateStr;
+            const sep = document.createElement('div');
+            sep.className = 'date-separator';
+            sep.innerHTML = `<span>${dateStr}</span>`;
+            area.appendChild(sep);
+          }
+          area.appendChild(buildMsgEl(key, msg));
+          if (isMine) allForceSeen = false;
+          if (!isMine) { hasOther = true; lastOtherMsg = msg; }
+        });
+
         updateSeenIndicator();
 
-        if (!isMine && !isFirstLoad[chatId]) {
+        if (hasOther && !isFirstLoad[chatId]) {
           db.ref(`chats/${chatId}/seen/${user}`).set(firebase.database.ServerValue.TIMESTAMP);
         }
-        // Keep saud's read marker current while the chat is open so the home
-        // screen unread count stays accurate.
         localStorage.setItem(`lastRead_${user}_${chatId}`, Date.now().toString());
 
         if (isFirstLoad[chatId]) {
           scrollToBottom(false);
         } else {
-          if (isMine || wasNearBottom) {
+          if (wasNearBottom || batch[batch.length - 1].msg.sender === user) {
             scrollToBottom(true);
           } else {
             showNewMsgPill();
           }
-          if (!isMine) {
+          if (lastOtherMsg) {
             const name = CONTACTS[partnerId].name;
-            notify(chatId, name, msgPreview(msg));
+            notify(chatId, name, msgPreview(lastOtherMsg));
           }
         }
+      }
+
+      function handleNewMessage(key, msg) {
+        if (renderedKeys.has(key)) return;
+        renderedKeys.add(key);
+        newMsgQueue.push({ key, msg });
+        if (!newMsgFlushTimer) newMsgFlushTimer = setTimeout(flushNewMessages, 80);
       }
 
       // Initial window: only the most recent PAGE_SIZE messages.
@@ -3808,13 +3844,13 @@
     // sender's tick flips to double without waiting for a new message.
     document.addEventListener('visibilitychange', function() {
       if (!document.hidden) {
+        if (db) { db.goOffline(); db.goOnline(); }
         markSeen();
-        // Resume the presence heartbeat when returning to an open chat.
         if (currentChatId && currentUser && db) startPresence();
         resubscribePushIfNeeded();
       } else {
-        releaseMic(); // free the mic (and its indicator) when backgrounded
-        stopPresence(); // drop "online" while backgrounded
+        releaseMic();
+        stopPresence();
       }
     });
     window.addEventListener('focus', markSeen);
