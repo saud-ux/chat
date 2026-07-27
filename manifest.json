@@ -4,6 +4,7 @@
   "description": "تطبيق رسائل خاص",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#5B8FB9",
   "dir": "rtl",
