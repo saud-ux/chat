@@ -84,7 +84,7 @@
     let currentAudioEl = null;
     let currentAudioBtn = null;
     let activeListeners = [];
-    let totalUnread = { w: 0, aseel: 0 };
+    let totalUnread = { w: 0, aseel: 0, 'w-aseel': 0 };
     let isFirstLoad = {};
     let pinnedToBottom = false;
     let audioCtx = null;
@@ -136,6 +136,17 @@
       return '';
     })();
 
+    function getChatId(user, partner) {
+      if (user === 'saud' || partner === 'saud') return user === 'saud' ? partner : user;
+      return 'w-aseel';
+    }
+
+    function getPartnerId(chatId, user) {
+      if (chatId === 'w-aseel') return user === 'w' ? 'aseel' : 'w';
+      if (user === 'saud') return chatId;
+      return 'saud';
+    }
+
     function route() {
       cleanup();
       const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -171,20 +182,28 @@
           showHome('saud');
         }
       } else if (APP_USER === 'w') {
-        if (path === BASE_PATH + '/chat') {
+        if (path === BASE_PATH + '/chat/saud') {
           currentView = 'chat';
           $('page-chat').classList.add('active');
           showChat('w', 'w');
+        } else if (path === BASE_PATH + '/chat/aseel') {
+          currentView = 'chat';
+          $('page-chat').classList.add('active');
+          showChat('w-aseel', 'w');
         } else {
           currentView = 'home';
           $('page-home').classList.add('active');
           showHome('w');
         }
       } else {
-        if (path === BASE_PATH + '/chat') {
+        if (path === BASE_PATH + '/chat/saud') {
           currentView = 'chat';
           $('page-chat').classList.add('active');
           showChat('aseel', 'aseel');
+        } else if (path === BASE_PATH + '/chat/w') {
+          currentView = 'chat';
+          $('page-chat').classList.add('active');
+          showChat('w-aseel', 'aseel');
         } else {
           currentView = 'home';
           $('page-home').classList.add('active');
@@ -319,15 +338,15 @@
         chatPartners = ['w', 'aseel'];
         chatPath = (id) => `/chat/${id}`;
       } else if (homeUser === 'w') {
-        chatPartners = ['saud'];
-        chatPath = () => BASE_PATH + '/chat';
+        chatPartners = ['saud', 'aseel'];
+        chatPath = (id) => BASE_PATH + '/chat/' + id;
       } else {
-        chatPartners = ['saud'];
-        chatPath = () => BASE_PATH + '/chat';
+        chatPartners = ['saud', 'w'];
+        chatPath = (id) => BASE_PATH + '/chat/' + id;
       }
 
       chatPartners.forEach(partnerId => {
-        const chatId = homeUser === 'saud' ? partnerId : homeUser;
+        const chatId = getChatId(homeUser, partnerId);
         const card = document.createElement('div');
         card.className = 'chat-card';
         card.id = `card-${partnerId}`;
@@ -391,16 +410,15 @@
 
     function listenForHomeNotifications(user, partners) {
       user = user || 'saud';
-      const chatIds = user === 'saud' ? ['w', 'aseel'] : [user];
-      chatIds.forEach(chatId => {
+      partners.forEach(partner => {
+        const chatId = getChatId(user, partner);
         const ref = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp').limitToLast(1);
         let initial = true;
         addListener(ref, 'child_added', snap => {
           if (initial) { initial = false; return; }
           const msg = snap.val();
           if (msg.sender !== user) {
-            const partnerName = user === 'saud' ? CONTACTS[chatId].name : CONTACTS.saud.name;
-            notify(chatId, partnerName, msgPreview(msg));
+            notify(chatId, CONTACTS[partner].name, msgPreview(msg));
           }
         });
       });
@@ -426,7 +444,7 @@
       isFirstLoad[chatId] = true;
 
       const isSaud = user === 'saud';
-      const partnerId = isSaud ? chatId : 'saud';
+      const partnerId = getPartnerId(chatId, user);
       const partnerName = CONTACTS[partnerId].name;
       const partnerColor = CONTACTS[partnerId].color;
       const partnerAvatar = AVATARS[partnerId];
@@ -504,11 +522,7 @@
         }
       });
 
-      if (isSaud) {
-        localStorage.setItem(`lastRead_saud_${chatId}`, Date.now().toString());
-      } else {
-        localStorage.setItem(`lastRead_${chatId}_${user}`, Date.now().toString());
-      }
+      localStorage.setItem(`lastRead_${user}_${chatId}`, Date.now().toString());
 
       // Windowed loading: long conversations used to sync and render EVERY
       // message on open, which made chats slow to load. Instead we render only
@@ -703,9 +717,7 @@
         }
         // Keep saud's read marker current while the chat is open so the home
         // screen unread count stays accurate.
-        if (user === 'saud') {
-          localStorage.setItem(`lastRead_saud_${chatId}`, Date.now().toString());
-        }
+        localStorage.setItem(`lastRead_${user}_${chatId}`, Date.now().toString());
 
         if (isFirstLoad[chatId]) {
           scrollToBottom(false);
@@ -716,7 +728,7 @@
             showNewMsgPill();
           }
           if (!isMine) {
-            const name = user === 'saud' ? CONTACTS[chatId].name : 'سعود';
+            const name = CONTACTS[partnerId].name;
             notify(chatId, name, msgPreview(msg));
           }
         }
@@ -1586,8 +1598,9 @@
     function showToast(chatId, name, text) {
       toastChatId = chatId;
       const toast = $('toast');
-      const color = CONTACTS[chatId] ? CONTACTS[chatId].color : '#5B8FB9';
-      const avatar = AVATARS[chatId] || '';
+      const pid = getPartnerId(chatId, APP_USER);
+      const color = CONTACTS[pid] ? CONTACTS[pid].color : '#5B8FB9';
+      const avatar = AVATARS[pid] || '';
       toast.innerHTML = `
         <div class="toast-avatar" style="background:${color}">${avatar}</div>
         <div class="toast-body">
@@ -1607,11 +1620,8 @@
       clearTimeout(toastTimer);
       $('toast').style.display = 'none';
       if (toastChatId && currentView === 'home') {
-        if (APP_USER === 'saud') {
-          navigate(`/chat/${toastChatId}`);
-        } else {
-          navigate(BASE_PATH + '/chat');
-        }
+        const pid = getPartnerId(toastChatId, APP_USER);
+        navigate(BASE_PATH + '/chat/' + pid);
       }
     }
 
@@ -1673,7 +1683,7 @@
     }
 
     function updateTitleBadge() {
-      const total = (totalUnread.w || 0) + (totalUnread.aseel || 0);
+      const total = Object.values(totalUnread).reduce((s, n) => s + (n || 0), 0);
       document.title = total > 0 ? `(${total}) رسائل` : 'رسائل';
     }
 
@@ -2305,19 +2315,13 @@
     }
 
     function pickPartnerForGame(gameType) {
-      if (homeUser === 'w') {
-        startGameInline(gameType, 'w', 'w');
-        return;
-      }
-      if (homeUser === 'aseel') {
-        startGameInline(gameType, 'aseel', 'aseel');
-        return;
-      }
-
-      const partners = ['w', 'aseel'];
+      let partners;
+      if (homeUser === 'saud') partners = ['w', 'aseel'];
+      else if (homeUser === 'w') partners = ['saud', 'aseel'];
+      else partners = ['saud', 'w'];
       let html = '';
       partners.forEach(id => {
-        html += `<div class="game-partner-card" onclick="hideMsgActions();startGameInline('${gameType}','${id}','saud')">
+        html += `<div class="game-partner-card" onclick="hideMsgActions();startGameInline('${gameType}',getChatId('${homeUser}','${id}'),'${homeUser}')">
           <div class="chat-avatar" style="background:${CONTACTS[id].color}">${AVATARS[id]}</div>
           <span>${CONTACTS[id].name}</span>
         </div>`;
