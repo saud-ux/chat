@@ -1173,6 +1173,8 @@
         if (recSeconds >= 300) stopRecording(true);
       }, 1000);
       if (navigator.vibrate) navigator.vibrate(15);
+      playRecStartSound();
+      startLiveWaveform(stream);
     }
 
     // Keep one granted microphone stream alive for the session and reuse it,
@@ -1223,6 +1225,7 @@
       recShouldSend = send;
       recFinalDuration = recSeconds;
       if (recTimer) { clearInterval(recTimer); recTimer = null; }
+      stopLiveWaveform();
       try { mediaRecorder.stop(); } catch (e) {}
       // Keep the mic stream alive briefly so back-to-back voice notes don't
       // trigger a fresh permission prompt; release it after a short idle.
@@ -1246,14 +1249,22 @@
     }
 
     async function sendAudioMessage(blob, duration) {
+      const chatId = currentChatId;
+      const user = currentUser;
+      if (!chatId || !user) return;
       try {
         if (blob.size > 15 * 1024 * 1024) {
           alert('التسجيل كبير جداً. حاول تسجيلاً أقصر.');
           return;
         }
-        const url = await uploadToCloudinary(blob);
+        showAudioUploadIndicator();
+        const url = await uploadToCloudinary(blob, (p) => {
+          updateAudioUploadProgress(p);
+        });
+        hideAudioUploadIndicator();
+        playRecSendSound();
         const msg = {
-          sender: currentUser,
+          sender: user,
           type: 'audio',
           content: url,
           duration: duration,
@@ -1268,10 +1279,109 @@
           };
           cancelReply();
         }
-        await db.ref(`chats/${currentChatId}/messages`).push(msg);
-        sendPush(currentChatId, '🎤 رسالة صوتية');
+        await db.ref(`chats/${chatId}/messages`).push(msg);
+        sendPush(chatId, '🎤 رسالة صوتية');
       } catch (e) {
+        hideAudioUploadIndicator();
         alert('فشل إرسال التسجيل. حاول مرة أخرى.');
+      }
+    }
+
+    function showAudioUploadIndicator() {
+      let el = document.getElementById('audio-upload-indicator');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'audio-upload-indicator';
+        el.className = 'audio-upload-indicator';
+        el.innerHTML = '<div class="audio-upload-bar"><div class="audio-upload-fill" id="audio-upload-fill"></div></div><span class="audio-upload-text" id="audio-upload-text">جاري إرسال الصوت...</span>';
+        const inputArea = $('input-area');
+        if (inputArea) inputArea.parentNode.insertBefore(el, inputArea);
+      }
+      el.style.display = 'flex';
+      const fill = document.getElementById('audio-upload-fill');
+      if (fill) fill.style.width = '5%';
+    }
+
+    function updateAudioUploadProgress(ratio) {
+      const fill = document.getElementById('audio-upload-fill');
+      const text = document.getElementById('audio-upload-text');
+      if (fill) fill.style.width = Math.round(5 + ratio * 90) + '%';
+      if (text) text.textContent = Math.round(ratio * 100) + '% جاري الرفع...';
+    }
+
+    function hideAudioUploadIndicator() {
+      const el = document.getElementById('audio-upload-indicator');
+      if (el) el.style.display = 'none';
+    }
+
+    function playRecSendSound() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.frequency.value = 1200;
+        osc.type = 'sine';
+        g.gain.setValueAtTime(0.1, now);
+        g.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+        osc.start(now); osc.stop(now + 0.08);
+      } catch(e) {}
+    }
+
+    function playRecStartSound() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.frequency.value = 600;
+        osc.type = 'sine';
+        g.gain.setValueAtTime(0.12, now);
+        g.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now); osc.stop(now + 0.1);
+      } catch(e) {}
+    }
+
+    let recAnalyser = null;
+    let recAnimFrame = null;
+
+    function startLiveWaveform(stream) {
+      stopLiveWaveform();
+      const liveWave = document.getElementById('rec-live-wave');
+      if (!liveWave) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const source = audioCtx.createMediaStreamSource(stream);
+        recAnalyser = audioCtx.createAnalyser();
+        recAnalyser.fftSize = 128;
+        source.connect(recAnalyser);
+        const data = new Uint8Array(recAnalyser.frequencyBinCount);
+        const bars = liveWave.querySelectorAll('.rec-wave-bar');
+        const draw = () => {
+          recAnimFrame = requestAnimationFrame(draw);
+          recAnalyser.getByteFrequencyData(data);
+          const step = Math.floor(data.length / bars.length);
+          bars.forEach((bar, i) => {
+            const val = data[i * step] || 0;
+            const h = 15 + (val / 255) * 85;
+            bar.style.height = h + '%';
+          });
+        };
+        draw();
+      } catch(e) {}
+    }
+
+    function stopLiveWaveform() {
+      if (recAnimFrame) { cancelAnimationFrame(recAnimFrame); recAnimFrame = null; }
+      recAnalyser = null;
+      const liveWave = document.getElementById('rec-live-wave');
+      if (liveWave) {
+        liveWave.querySelectorAll('.rec-wave-bar').forEach(b => { b.style.height = '15%'; });
       }
     }
 
@@ -1659,14 +1769,15 @@
     }
 
     function sendPush(chatId, preview) {
-      const recipient = (currentUser === 'saud') ? chatId : 'saud';
-      const senderName = currentUser === 'saud' ? 'سعود' : CONTACTS[chatId].name;
-      const recipientUrl = recipient === 'saud' ? `/chat/${chatId}` : `/${recipient}`;
+      const senderName = currentUser === 'saud' ? 'سعود' : (CONTACTS[currentUser] ? CONTACTS[currentUser].name : currentUser);
+      const partnerId = getPartnerId(chatId, currentUser);
 
-      db.ref(`push-subscriptions/${recipient}`).once('value', snap => {
+      const recipientUrl = partnerId === 'saud' ? `/chat/${chatId}` : `/${partnerId}/chat/${currentUser === 'saud' ? 'saud' : (chatId === 'w-aseel' ? (partnerId === 'w' ? 'aseel' : 'w') : 'saud')}`;
+
+      db.ref(`push-subscriptions/${partnerId}`).once('value', snap => {
         const subs = snap.val();
         if (!subs) return;
-        Object.values(subs).forEach(sub => {
+        Object.entries(subs).forEach(([subKey, sub]) => {
           fetch('/.netlify/functions/send-push', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1677,6 +1788,10 @@
               body: preview,
               url: recipientUrl
             })
+          }).then(res => {
+            if (res.status === 410 || res.status === 404) {
+              db.ref(`push-subscriptions/${partnerId}/${subKey}`).remove();
+            }
           }).catch(() => {});
         });
       });
@@ -2882,7 +2997,7 @@
     }
 
     function dismissNotifPrompt() {
-      const userId = currentUser || inferUserId();
+      const userId = currentUser || APP_USER;
       if (userId) localStorage.setItem('notif_dismissed_' + userId, 'true');
       const p = document.getElementById('notif-prompt');
       if (p) p.remove();
@@ -2978,6 +3093,26 @@
           }).then(newSub => {
             savePushSubscription(newSub);
           }).catch(() => {});
+        });
+      });
+    }
+
+    function resubscribePushIfNeeded() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      if (Notification.permission !== 'granted') return;
+      navigator.serviceWorker.ready.then(reg => {
+        reg.pushManager.getSubscription().then(sub => {
+          if (!sub) {
+            const convertedKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+            reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: convertedKey
+            }).then(newSub => {
+              savePushSubscription(newSub);
+            }).catch(() => {});
+          } else {
+            savePushSubscription(sub);
+          }
         });
       });
     }
@@ -3651,6 +3786,7 @@
         markSeen();
         // Resume the presence heartbeat when returning to an open chat.
         if (currentChatId && currentUser && db) startPresence();
+        resubscribePushIfNeeded();
       } else {
         releaseMic(); // free the mic (and its indicator) when backgrounded
         stopPresence(); // drop "online" while backgrounded

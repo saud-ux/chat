@@ -1,7 +1,7 @@
 const webpush = require('web-push');
 
-const VAPID_PUBLIC_KEY = 'BOIMSoH3ZuHz_eL09w-2cOw7FSGyTTew3q3XlJsuwe4yBvnEbi1ee3mnwz3hOvS4rA_SigRsest_GbV_KgLZPV8';
-const VAPID_PRIVATE_KEY = '2oC4anJ19gv8ylo1D2XBDBWuiBiXfvnu6OzI-rIeE5E';
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BOIMSoH3ZuHz_eL09w-2cOw7FSGyTTew3q3XlJsuwe4yBvnEbi1ee3mnwz3hOvS4rA_SigRsest_GbV_KgLZPV8';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '2oC4anJ19gv8ylo1D2XBDBWuiBiXfvnu6OzI-rIeE5E';
 
 webpush.setVapidDetails(
   'mailto:saud.alh6@gmail.com',
@@ -10,6 +10,18 @@ webpush.setVapidDetails(
 );
 
 exports.handler = async function(event) {
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      },
+      body: ''
+    };
+  }
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
@@ -21,14 +33,35 @@ exports.handler = async function(event) {
       return { statusCode: 400, body: 'Missing subscription' };
     }
 
-    const payload = JSON.stringify({ title: title || 'رسالة جديدة', body: body || '', url: url || '/' });
+    const payload = JSON.stringify({
+      title: title || 'رسالة جديدة',
+      body: body || '',
+      url: url || '/'
+    });
 
-    await webpush.sendNotification(subscription, payload);
-    return { statusCode: 200, body: 'OK' };
+    const options = {
+      TTL: 60 * 60,
+      urgency: 'high'
+    };
+
+    await webpush.sendNotification(subscription, payload, options);
+    return {
+      statusCode: 200,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: 'OK'
+    };
   } catch (err) {
     if (err.statusCode === 410 || err.statusCode === 404) {
-      return { statusCode: 410, body: 'Subscription expired' };
+      return {
+        statusCode: 410,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: 'Subscription expired'
+      };
     }
-    return { statusCode: 500, body: 'Push failed' };
+    return {
+      statusCode: 500,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: 'Push failed: ' + (err.message || '')
+    };
   }
 };

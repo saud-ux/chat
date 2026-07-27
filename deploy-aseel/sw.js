@@ -1,4 +1,4 @@
-var CACHE_VERSION = 'v34';
+var CACHE_VERSION = 'v35';
 
 self.addEventListener('install', function(event) {
   self.skipWaiting();
@@ -45,22 +45,37 @@ self.addEventListener('push', function(event) {
   }
 
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/icon-192.svg',
-      badge: '/icon-192.svg',
-      dir: 'rtl',
-      lang: 'ar',
-      vibrate: [200, 100, 200],
-      tag: 'chat-msg',
-      renotify: true,
-      data: { url: data.url || '/' }
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        if (clientList[i].visibilityState === 'visible') {
+          return;
+        }
+      }
+      return self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: '/icon-192.svg',
+        badge: '/icon-192.svg',
+        dir: 'rtl',
+        lang: 'ar',
+        vibrate: [200, 100, 200],
+        tag: 'chat-' + (data.title || 'msg'),
+        renotify: true,
+        requireInteraction: false,
+        actions: [
+          { action: 'open', title: 'فتح' },
+          { action: 'dismiss', title: 'تجاهل' }
+        ],
+        data: { url: data.url || '/' }
+      });
     })
   );
 });
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
+
+  if (event.action === 'dismiss') return;
+
   var targetUrl = event.notification.data && event.notification.data.url ? event.notification.data.url : '/';
 
   event.waitUntil(
