@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>أسيل</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="أسيل">
+  <link rel="apple-touch-icon" href="/icon-192.svg">
+  <meta name="theme-color" content="#5B8FB9">
+  <meta name="app-user" content="aseel">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div id="app">
+    <!-- HOME PAGE -->
+    <div id="page-home" class="page">
+      <div class="app-wrap">
+        <header class="home-header">
+          <svg class="home-logo" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <rect width="48" height="48" rx="12" fill="#5B8FB9"/>
+            <path d="M24 10c-7.732 0-14 5.598-14 12.5 0 3.864 1.907 7.321 4.9 9.667L13 40l6.8-3.2c1.067.4 2.133.533 3.2.533 7.732 0 14-5.598 14-12.5S31.732 10 24 10z" fill="#fff" opacity="0.95"/>
+            <circle cx="19" cy="22.5" r="1.8" fill="#5B8FB9"/>
+            <circle cx="24" cy="22.5" r="1.8" fill="#5B8FB9"/>
+            <circle cx="29" cy="22.5" r="1.8" fill="#5B8FB9"/>
+          </svg>
+          <h1 class="home-title" id="home-title">رسائل</h1>
+          <button class="btn-refresh" id="btn-refresh-home" onclick="forceUpdate(this)" aria-label="تحديث">🔄</button>
+        </header>
+        <div class="swipe-container" id="swipe-container">
+          <div class="swipe-page" id="swipe-page-chats">
+            <div id="chat-list" class="chat-list"></div>
+          </div>
+          <div class="swipe-page" id="swipe-page-games">
+            <div class="games-page" id="games-page">
+              <div class="games-grid" id="games-grid"></div>
+              <div class="games-active" id="games-active"></div>
+            </div>
+          </div>
+        </div>
+        <div class="swipe-dots" id="swipe-dots">
+          <span class="swipe-dot active" id="dot-chats"></span>
+          <span class="swipe-dot" id="dot-games"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT PAGE -->
+    <div id="page-chat" class="page">
+      <div class="app-wrap">
+        <header id="chat-header" class="chat-header"></header>
+        <div id="messages-area" class="messages-area"></div>
+        <button id="btn-scroll-bottom" class="btn-scroll-bottom" onclick="scrollToBottom(true)">↓</button>
+        <div id="media-preview" class="media-preview-bar" style="display:none"></div>
+        <div id="edit-indicator" class="edit-indicator" style="display:none">
+          <span>✏️ تعديل الرسالة</span>
+          <button class="btn-cancel-edit" onclick="cancelEdit()">✕</button>
+        </div>
+        <div id="typing-indicator" class="typing-indicator" style="display:none">
+          <span class="typing-dots"><span></span><span></span><span></span></span>
+          <span>يكتب...</span>
+        </div>
+        <div class="record-bar" id="record-bar" style="display:none">
+          <button class="rec-cancel" id="rec-cancel" aria-label="إلغاء التسجيل">🗑️</button>
+          <div class="rec-meta"><span class="rec-dot"></span><span id="rec-timer">0:00</span></div>
+          <span class="rec-hint">جاري التسجيل…</span>
+          <button class="rec-send" id="rec-send" aria-label="إرسال التسجيل">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+        <div class="input-area" id="input-area">
+          <button class="btn-attach" id="btn-attach" aria-label="إرفاق ملف">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <button class="btn-gif" id="btn-gif" aria-label="GIF">GIF</button>
+          <div class="msg-input is-empty" id="msg-input" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="اكتب رسالة..." dir="auto" enterkeyhint="send"></div>
+          <button class="btn-send" id="btn-send" aria-label="إرسال" style="display:none">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+          <button class="btn-mic" id="btn-mic" aria-label="رسالة صوتية">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 003-3V6a3 3 0 00-6 0v6a3 3 0 003 3z"/><path d="M19 11a1 1 0 00-2 0 5 5 0 01-10 0 1 1 0 00-2 0 7 7 0 006 6.92V21a1 1 0 002 0v-3.08A7 7 0 0019 11z"/></svg>
+          </button>
+        </div>
+        <input type="file" id="file-input" accept="image/*,video/mp4,video/quicktime,video/webm" style="display:none">
+      </div>
+    </div>
+
+    <!-- IMAGE VIEWER -->
+    <div id="image-viewer" class="viewer-overlay" style="display:none">
+      <button class="btn-viewer-close" id="btn-viewer-close">&times;</button>
+      <img id="viewer-img" src="" alt="">
+    </div>
+
+    <!-- UPLOAD PROGRESS -->
+    <div id="upload-overlay" class="upload-overlay" style="display:none">
+      <div class="upload-box">
+        <div class="upload-bar"><div class="upload-fill" id="upload-fill"></div></div>
+        <span class="upload-text" id="upload-text">جاري الرفع... ٠٪</span>
+      </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="toast" style="display:none" onclick="toastTap()"></div>
+
+    <!-- MESSAGE ACTIONS SHEET -->
+    <div id="msg-actions-overlay" class="msg-actions-overlay" style="display:none" onclick="hideMsgActions()">
+      <div class="msg-actions" id="msg-actions-content" onclick="event.stopPropagation()"></div>
+    </div>
+
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+
+  <script src="/app.js"></script>
+</body>
+</html>
