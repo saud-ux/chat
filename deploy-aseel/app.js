@@ -1463,17 +1463,45 @@
       if (wrap) wrap.querySelectorAll('.audio-bar.played').forEach(b => b.classList.remove('played'));
     }
 
+    let speakerAudioCtx = null;
+    function getSpeakerCtx() {
+      if (!speakerAudioCtx || speakerAudioCtx.state === 'closed') {
+        speakerAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (speakerAudioCtx.state === 'suspended') speakerAudioCtx.resume();
+      return speakerAudioCtx;
+    }
+
     function createSpeakerAudio(src) {
       const el = document.createElement('video');
       el.setAttribute('playsinline', '');
       el.setAttribute('webkit-playsinline', '');
+      el.crossOrigin = 'anonymous';
       el.preload = 'auto';
       el.volume = 1.0;
       el.muted = false;
       el.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;opacity:0;pointer-events:none;';
       el.src = src;
       document.body.appendChild(el);
-      el._cleanup = () => { try { el.remove(); } catch(e) {} };
+
+      try {
+        const ctx = getSpeakerCtx();
+        const source = ctx.createMediaElementSource(el);
+        const gain = ctx.createGain();
+        gain.gain.value = 2.0;
+        source.connect(gain);
+        gain.connect(ctx.destination);
+        el._gainNode = gain;
+        el._audioSource = source;
+      } catch(e) {}
+
+      el._cleanup = () => {
+        try {
+          if (el._audioSource) { el._audioSource.disconnect(); el._audioSource = null; }
+          if (el._gainNode) { el._gainNode.disconnect(); el._gainNode = null; }
+          el.remove();
+        } catch(e) {}
+      };
       return el;
     }
 
@@ -1483,8 +1511,12 @@
       const storedDur = parseFloat(wrap.getAttribute('data-dur')) || 0;
 
       if (currentAudioBtn === btn && currentAudioEl) {
-        if (currentAudioEl.paused) { currentAudioEl.play().catch(() => {}); }
-        else { currentAudioEl.pause(); }
+        if (currentAudioEl.paused) {
+          getSpeakerCtx();
+          currentAudioEl.play().catch(() => {});
+        } else {
+          currentAudioEl.pause();
+        }
         return;
       }
 
