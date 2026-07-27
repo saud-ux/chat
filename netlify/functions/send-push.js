@@ -21,14 +21,26 @@ exports.handler = async function(event) {
       return { statusCode: 400, body: 'Missing subscription' };
     }
 
-    const payload = JSON.stringify({ title: title || 'رسالة جديدة', body: body || '', url: url || '/' });
+    const payload = JSON.stringify({
+      title: title || 'رسالة جديدة',
+      body: body || '',
+      url: url || '/'
+    });
 
-    await webpush.sendNotification(subscription, payload);
+    const options = {
+      TTL: 60 * 60,
+      urgency: 'high',
+    };
+
+    await webpush.sendNotification(subscription, payload, options);
     return { statusCode: 200, body: 'OK' };
   } catch (err) {
     if (err.statusCode === 410 || err.statusCode === 404) {
       return { statusCode: 410, body: 'Subscription expired' };
     }
-    return { statusCode: 500, body: 'Push failed' };
+    if (err.statusCode === 429) {
+      return { statusCode: 429, body: 'Rate limited' };
+    }
+    return { statusCode: 500, body: 'Push failed: ' + (err.message || '') };
   }
 };

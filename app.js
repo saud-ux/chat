@@ -1119,6 +1119,9 @@
       return m + ':' + (sec < 10 ? '0' : '') + sec;
     }
 
+    let recAnalyser = null;
+    let recLevelRAF = null;
+
     async function startRecording() {
       if (mediaRecorder) return;
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
@@ -1144,9 +1147,6 @@
       for (const c of candidates) {
         try { if (MediaRecorder.isTypeSupported(c)) { mime = c; break; } } catch (e) {}
       }
-      // High-quality voice. Opus is efficient so 96kbps is already beyond
-      // transparent for speech; lossy AAC/mp4 (iOS Safari) is given 192kbps.
-      // Even at 192kbps a full 5-min note is ~7MB, well under the 15MB cap.
       const isOpus = /opus/i.test(mime);
       const audioBitrate = isOpus ? 96000 : 192000;
       try {
@@ -1162,6 +1162,8 @@
       mediaRecorder.onstop = handleRecordingStop;
       mediaRecorder.start();
 
+      startRecLevelMeter(stream);
+
       const inputArea = $('input-area');
       if (inputArea) inputArea.style.display = 'none';
       const rb = $('record-bar');
@@ -1175,6 +1177,50 @@
       if (navigator.vibrate) navigator.vibrate(15);
     }
 
+    function startRecLevelMeter(stream) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.4;
+        source.connect(analyser);
+        recAnalyser = { ctx, analyser, source };
+
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        const bars = document.getElementById('rec-level-bars');
+
+        function draw() {
+          if (!recAnalyser) return;
+          recLevelRAF = requestAnimationFrame(draw);
+          analyser.getByteFrequencyData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) sum += data[i];
+          const avg = sum / data.length / 255;
+          const level = Math.min(1, avg * 2.5);
+
+          if (bars) {
+            const children = bars.children;
+            for (let i = 0; i < children.length; i++) {
+              const offset = Math.abs(i - Math.floor(children.length / 2)) / (children.length / 2);
+              const h = 15 + (level * (1 - offset * 0.6)) * 85;
+              children[i].style.height = h + '%';
+            }
+          }
+        }
+        draw();
+      } catch (e) {}
+    }
+
+    function stopRecLevelMeter() {
+      if (recLevelRAF) { cancelAnimationFrame(recLevelRAF); recLevelRAF = null; }
+      if (recAnalyser) {
+        try { recAnalyser.source.disconnect(); } catch (e) {}
+        try { recAnalyser.ctx.close(); } catch (e) {}
+        recAnalyser = null;
+      }
+    }
+
     // Keep one granted microphone stream alive for the session and reuse it,
     // so the browser doesn't re-prompt for permission on every voice note.
     // It's released when leaving the chat, backgrounding, or after idle.
@@ -1183,20 +1229,16 @@
         return micStream;
       }
       micStream = null;
-      // Capture raw, full-band audio. The browser's voice pipeline (echo
-      // cancellation / noise suppression / auto gain) band-limits the signal
-      // and makes voice notes sound muffled, so all of it is turned off.
       const audioConstraints = {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
         channelCount: 1,
         sampleRate: 48000
       };
       try {
         micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
       } catch (e) {
-        // Fall back to plain audio if the device rejects the constraints
         micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       }
       return micStream;
@@ -1223,9 +1265,8 @@
       recShouldSend = send;
       recFinalDuration = recSeconds;
       if (recTimer) { clearInterval(recTimer); recTimer = null; }
+      stopRecLevelMeter();
       try { mediaRecorder.stop(); } catch (e) {}
-      // Keep the mic stream alive briefly so back-to-back voice notes don't
-      // trigger a fresh permission prompt; release it after a short idle.
       scheduleMicRelease();
       const rb = $('record-bar');
       if (rb) rb.style.display = 'none';
@@ -1659,14 +1700,14 @@
     }
 
     function sendPush(chatId, preview) {
-      const recipient = (currentUser === 'saud') ? chatId : 'saud';
-      const senderName = currentUser === 'saud' ? 'سعود' : CONTACTS[chatId].name;
-      const recipientUrl = recipient === 'saud' ? `/chat/${chatId}` : `/${recipient}`;
+      const recipient = getPartnerId(chatId, currentUser);
+      const senderName = currentUser === 'saud' ? 'سعود' : (CONTACTS[currentUser] ? CONTACTS[currentUser].name : currentUser);
+      const recipientUrl = recipient === 'saud' ? `/chat/${chatId}` : `/${recipient}/chat/${currentUser === 'saud' ? 'saud' : (chatId === 'w-aseel' ? (recipient === 'w' ? 'w' : 'aseel') : 'saud')}`;
 
       db.ref(`push-subscriptions/${recipient}`).once('value', snap => {
         const subs = snap.val();
         if (!subs) return;
-        Object.values(subs).forEach(sub => {
+        Object.entries(subs).forEach(([subKey, sub]) => {
           fetch('/.netlify/functions/send-push', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1677,6 +1718,10 @@
               body: preview,
               url: recipientUrl
             })
+          }).then(res => {
+            if (res.status === 410 || res.status === 404) {
+              db.ref(`push-subscriptions/${recipient}/${subKey}`).remove();
+            }
           }).catch(() => {});
         });
       });
@@ -2982,14 +3027,51 @@
       });
     }
 
+    function resubscribePush() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      navigator.serviceWorker.ready.then(reg => {
+        reg.pushManager.getSubscription().then(sub => {
+          if (sub) {
+            sub.unsubscribe().then(() => {
+              const convertedKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+              reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: convertedKey
+              }).then(newSub => savePushSubscription(newSub)).catch(() => {});
+            }).catch(() => {});
+          } else {
+            subscribePush();
+          }
+        });
+      });
+    }
+
     function savePushSubscription(sub) {
       if (!db) return;
       const userId = APP_USER;
       const subData = sub.toJSON();
       const subKey = btoa(subData.endpoint).replace(/[.#$\[\]\/]/g, '_').substring(0, 100);
+      subData._ts = Date.now();
       db.ref(`push-subscriptions/${userId}/${subKey}`).set(subData);
       const others = ['saud', 'w', 'aseel'].filter(u => u !== userId);
       others.forEach(u => db.ref(`push-subscriptions/${u}/${subKey}`).remove());
+      cleanOldSubscriptions(userId, subKey);
+    }
+
+    function cleanOldSubscriptions(userId, currentKey) {
+      if (!db) return;
+      const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+      db.ref(`push-subscriptions/${userId}`).once('value', snap => {
+        const subs = snap.val();
+        if (!subs) return;
+        const now = Date.now();
+        Object.entries(subs).forEach(([key, sub]) => {
+          if (key === currentKey) return;
+          if (sub._ts && (now - sub._ts) > MAX_AGE) {
+            db.ref(`push-subscriptions/${userId}/${key}`).remove();
+          }
+        });
+      });
     }
 
     function urlBase64ToUint8Array(base64String) {
@@ -3644,6 +3726,9 @@
     route();
     window.addEventListener('popstate', route);
 
+    // Re-subscribe push every 12 hours to keep tokens fresh
+    setInterval(resubscribePush, 12 * 60 * 60 * 1000);
+
     // Re-confirm "seen" the moment the user returns to an open chat, so the
     // sender's tick flips to double without waiting for a new message.
     document.addEventListener('visibilitychange', function() {
@@ -3651,6 +3736,8 @@
         markSeen();
         // Resume the presence heartbeat when returning to an open chat.
         if (currentChatId && currentUser && db) startPresence();
+        // Re-subscribe push when returning to foreground
+        subscribePush();
       } else {
         releaseMic(); // free the mic (and its indicator) when backgrounded
         stopPresence(); // drop "online" while backgrounded
