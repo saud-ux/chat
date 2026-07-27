@@ -3787,10 +3787,44 @@
           ${hasWpImg ? '<button class="btn-wallpaper-reset" onclick="resetWallpaperImg()">إزالة صورة الخلفية</button>' : ''}
           <input type="file" id="wp-file-input" accept="image/*" style="display:none" onchange="setWallpaperImage(this)">
         </div>
+        ${APP_USER === 'saud' ? '<button class="btn-saved-open" onclick="testPushNotification()" style="background:#ef4444">🔔 تيست إشعار</button>' : ''}
         <button class="btn-settings-close" onclick="this.closest('.settings-overlay').remove()">إغلاق</button>
       </div>`;
 
       document.body.appendChild(overlay);
+    }
+
+    function testPushNotification() {
+      if (Notification.permission !== 'granted') {
+        Notification.requestPermission().then(p => { if (p === 'granted') testPushNotification(); });
+        return;
+      }
+      try { new Notification('تيست 🔔', { body: 'هذا إشعار تجريبي — الإشعارات تعمل!', icon: '/icon-192.svg' }); } catch(e) {}
+      notify('test', 'تيست', 'الإشعارات تعمل!');
+
+      db.ref('push-subscriptions/saud').once('value', snap => {
+        const subs = snap.val();
+        if (!subs) { alert('لا يوجد اشتراك push محفوظ'); return; }
+        const count = Object.keys(subs).length;
+        Object.entries(subs).forEach(([subKey, sub]) => {
+          fetch('/.netlify/functions/send-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              subscription: sub,
+              title: '🔔 تيست',
+              body: 'إشعار تجريبي — Push يعمل!',
+              url: '/'
+            })
+          }).then(res => {
+            if (res.ok) alert('Push أُرسل بنجاح (' + count + ' اشتراك)');
+            else if (res.status === 410 || res.status === 404) {
+              db.ref('push-subscriptions/saud/' + subKey).remove();
+              alert('اشتراك منتهي وتم حذفه، أعد فتح التطبيق');
+            } else alert('فشل الإرسال: ' + res.status);
+          }).catch(err => alert('خطأ: ' + err.message));
+        });
+      });
     }
 
     function setWallpaperImage(input) {
