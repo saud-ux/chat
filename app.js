@@ -427,7 +427,7 @@
           updateTitleBadge();
         }
       });
-      startRef.once('value', () => { initial = false; });
+      liveRef.once('value', () => { initial = false; });
     }
 
     function listenForHomeNotifications(user, partners) {
@@ -1592,6 +1592,9 @@
         video.preload = 'auto';
 
         var timeout = setTimeout(() => {
+          video.pause();
+          video.src = '';
+          video.load();
           fileToDataUrl(file).then(resolve).catch(reject);
         }, 120000);
 
@@ -1611,10 +1614,11 @@
           const ctx = canvas.getContext('2d');
 
           const stream = canvas.captureStream(30);
+          var compressAudioCtx = null;
           try {
-            const audioCtx2 = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioCtx2.createMediaElementSource(video);
-            const dest = audioCtx2.createMediaStreamDestination();
+            compressAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const source = compressAudioCtx.createMediaElementSource(video);
+            const dest = compressAudioCtx.createMediaStreamDestination();
             source.connect(dest);
             dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
           } catch(e) {}
@@ -1627,6 +1631,9 @@
           recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
           recorder.onstop = () => {
             clearTimeout(timeout);
+            if (compressAudioCtx) { try { compressAudioCtx.close(); } catch(e) {} }
+            video.src = '';
+            video.load();
             const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
@@ -1847,6 +1854,7 @@
 
     function speakMessage(text) {
       if (!text || !window.speechSynthesis) return;
+      speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'ar-SA';
       utter.rate = 1;
@@ -3187,7 +3195,7 @@
        PRESENCE ("in the conversation" indicator)
     ========================================================== */
     // How recent the other side's heartbeat must be to count as "online".
-    const PRESENCE_WINDOW = 10000;
+    const PRESENCE_WINDOW = 20000;
 
     // Heartbeat: while the chat is open and foregrounded, keep refreshing my own
     // "seen" timestamp (every 15s) and re-evaluate whether the other side is
@@ -3199,7 +3207,7 @@
       presenceTimer = setInterval(() => {
         markSeen();
         refreshPresenceView();
-      }, 5000);
+      }, 15000);
     }
 
     function stopPresence() {
@@ -3942,20 +3950,27 @@
        INIT
     ========================================================== */
     if ('serviceWorker' in navigator) {
+      var swReloading = false;
+      function swReload() {
+        if (swReloading) return;
+        swReloading = true;
+        window.location.reload();
+      }
       navigator.serviceWorker.register('/sw.js').then(function(reg) {
         reg.addEventListener('updatefound', function() {
           var newWorker = reg.installing;
+          if (!newWorker) return;
           newWorker.addEventListener('statechange', function() {
-            if (newWorker.state === 'activated') {
-              window.location.reload();
+            if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+              swReload();
             }
           });
         });
-        setInterval(function() { reg.update(); }, 60000);
+        setInterval(function() { reg.update(); }, 300000);
       }).catch(() => {});
       navigator.serviceWorker.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'SW_UPDATED') {
-          window.location.reload();
+          swReload();
         }
       });
     }
@@ -3968,7 +3983,6 @@
     // sender's tick flips to double without waiting for a new message.
     document.addEventListener('visibilitychange', function() {
       if (!document.hidden) {
-        if (db) { db.goOffline(); db.goOnline(); }
         markSeen();
         if (currentChatId && currentUser && db) startPresence();
         resubscribePushIfNeeded();
