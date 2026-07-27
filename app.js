@@ -269,7 +269,7 @@
       clearPendingMedia();
       if (mediaRecorder) stopRecording(false);
       releaseMic();
-      if (currentAudioEl) { currentAudioEl.pause(); resetAudioBtn(currentAudioBtn); currentAudioEl = null; currentAudioBtn = null; }
+      if (currentAudioEl) { currentAudioEl.pause(); if (currentAudioEl._cleanup) currentAudioEl._cleanup(); resetAudioBtn(currentAudioBtn); currentAudioEl = null; currentAudioBtn = null; }
       currentChatId = null;
       currentUser = null;
       myMessages = [];
@@ -1427,6 +1427,18 @@
       if (wrap) wrap.querySelectorAll('.audio-bar.played').forEach(b => b.classList.remove('played'));
     }
 
+    function createSpeakerAudio(src) {
+      const el = document.createElement('video');
+      el.setAttribute('playsinline', '');
+      el.setAttribute('webkit-playsinline', '');
+      el.preload = 'auto';
+      el.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+      el.src = src;
+      document.body.appendChild(el);
+      el._cleanup = () => { try { el.remove(); } catch(e) {} };
+      return el;
+    }
+
     function toggleAudioPlay(btn) {
       const wrap = btn.closest('.msg-audio');
       if (!wrap) return;
@@ -1440,19 +1452,20 @@
 
       if (currentAudioEl) {
         currentAudioEl.pause();
+        if (currentAudioEl._cleanup) currentAudioEl._cleanup();
         resetAudioBtn(currentAudioBtn);
         currentAudioEl = null;
         currentAudioBtn = null;
       }
 
-      const audio = new Audio(wrap.getAttribute('data-audio'));
+      const audio = createSpeakerAudio(wrap.getAttribute('data-audio'));
       audio.playbackRate = audioSpeed;
       currentAudioEl = audio;
       currentAudioBtn = btn;
 
       audio.onplay = () => { btn.textContent = '⏸'; audio.playbackRate = audioSpeed; };
       audio.onpause = () => { if (currentAudioBtn === btn) btn.textContent = '▶'; };
-      audio.onended = () => { btn.textContent = '▶'; paintWavePlayed(wrap, 0); };
+      audio.onended = () => { btn.textContent = '▶'; paintWavePlayed(wrap, 0); if (audio._cleanup) audio._cleanup(); };
       audio.ontimeupdate = () => {
         const d = (audio.duration && isFinite(audio.duration)) ? audio.duration : storedDur;
         if (d) paintWavePlayed(wrap, Math.min(1, audio.currentTime / d));
