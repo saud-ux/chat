@@ -1432,7 +1432,9 @@
       el.setAttribute('playsinline', '');
       el.setAttribute('webkit-playsinline', '');
       el.preload = 'auto';
-      el.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+      el.volume = 1.0;
+      el.muted = false;
+      el.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;opacity:0;pointer-events:none;';
       el.src = src;
       document.body.appendChild(el);
       el._cleanup = () => { try { el.remove(); } catch(e) {} };
