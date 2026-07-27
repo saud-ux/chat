@@ -121,10 +121,19 @@
        ROUTER
     ========================================================== */
     const APP_USER = (function() {
+      const meta = document.querySelector('meta[name="app-user"]');
+      if (meta && meta.content) return meta.content;
       const p = window.location.pathname;
       if (p.startsWith('/w')) return 'w';
       if (p.startsWith('/aseel')) return 'aseel';
       return 'saud';
+    })();
+
+    const BASE_PATH = (function() {
+      if (APP_USER === 'saud') return '';
+      const p = window.location.pathname;
+      if (p.startsWith('/' + APP_USER)) return '/' + APP_USER;
+      return '';
     })();
 
     function route() {
@@ -162,7 +171,7 @@
           showHome('saud');
         }
       } else if (APP_USER === 'w') {
-        if (path === '/w/chat') {
+        if (path === BASE_PATH + '/chat') {
           currentView = 'chat';
           $('page-chat').classList.add('active');
           showChat('w', 'w');
@@ -172,7 +181,7 @@
           showHome('w');
         }
       } else {
-        if (path === '/aseel/chat') {
+        if (path === BASE_PATH + '/chat') {
           currentView = 'chat';
           $('page-chat').classList.add('active');
           showChat('aseel', 'aseel');
@@ -221,7 +230,7 @@
     }
 
     function goToGamesPage() {
-      const homePath = APP_USER === 'saud' ? '/' : '/' + APP_USER;
+      const homePath = BASE_PATH || '/';
       exitChatSmoothly(homePath);
       setTimeout(() => swipeTo('games'), 350);
     }
@@ -311,10 +320,10 @@
         chatPath = (id) => `/chat/${id}`;
       } else if (homeUser === 'w') {
         chatPartners = ['saud'];
-        chatPath = () => '/w/chat';
+        chatPath = () => BASE_PATH + '/chat';
       } else {
         chatPartners = ['saud'];
-        chatPath = () => '/aseel/chat';
+        chatPath = () => BASE_PATH + '/chat';
       }
 
       chatPartners.forEach(partnerId => {
@@ -426,7 +435,7 @@
       const sunSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
       const moonSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>';
       $('chat-header').innerHTML = `
-        <button class="btn-back" onclick="exitChatSmoothly('${isSaud ? '/' : '/' + user}')">→</button>
+        <button class="btn-back" onclick="exitChatSmoothly('${isSaud ? '/' : (BASE_PATH || '/')}')">→</button>
         <div class="chat-header-avatar" style="background:${partnerColor}">
           ${partnerAvatar}
           <span class="presence-dot" id="presence-dot"></span>
@@ -1601,7 +1610,7 @@
         if (APP_USER === 'saud') {
           navigate(`/chat/${toastChatId}`);
         } else {
-          navigate(`/${APP_USER}/chat`);
+          navigate(BASE_PATH + '/chat');
         }
       }
     }
@@ -1730,7 +1739,7 @@
           chat.style.transform = 'translateX(-100%)';
           const done = () => {
             chat.removeEventListener('transitionend', done);
-            history.pushState(null, '', '/');
+            history.pushState(null, '', BASE_PATH || '/');
             cleanup();
             currentView = 'home';
             showHome();
@@ -2118,7 +2127,7 @@
       if (chatId === currentChatId) {
         scrollToMessage(key);
       } else {
-        const path = currentUser === 'saud' ? '/chat/' + chatId : '/' + chatId;
+        const path = currentUser === 'saud' ? '/chat/' + chatId : BASE_PATH + '/chat';
         navigate(path);
         setTimeout(() => scrollToMessage(key), 900);
       }
