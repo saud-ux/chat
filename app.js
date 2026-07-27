@@ -135,13 +135,14 @@
 
     function initDeviceLock(onReady) {
       if (APP_USER !== 'saud' || !IS_CONFIGURED) { deviceLockReady = true; deviceAllowed = true; onReady(); return; }
-      const myToken = localStorage.getItem('saud_device_token');
-      const lockRef = db.ref('deviceLock/saud');
+      const tokenKey = 'saud_device_v2';
+      const myToken = localStorage.getItem(tokenKey);
+      const lockRef = db.ref('deviceLock/saud_v2');
       lockRef.once('value', snap => {
         const stored = snap.val();
         if (!stored) {
           const token = crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36) + Date.now().toString(36));
-          localStorage.setItem('saud_device_token', token);
+          localStorage.setItem(tokenKey, token);
           lockRef.set(token);
           deviceAllowed = true;
         } else if (myToken === stored) {
@@ -161,8 +162,8 @@
       if (!bl) {
         bl = document.createElement('div');
         bl.id = 'device-blocked';
-        bl.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg,#fff);';
-        bl.innerHTML = '<div style="text-align:center;padding:24px;max-width:320px;"><div style="font-size:48px;margin-bottom:16px;">🔒</div><div style="font-size:20px;font-weight:700;margin-bottom:8px;">جهاز غير مسجّل</div><div style="font-size:14px;color:var(--muted);">هذا الرابط مقفل على جهاز سعود فقط</div></div>';
+        bl.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg,#fff);color:var(--their-text,#1a1a1a);';
+        bl.innerHTML = '<div style="text-align:center;padding:24px;max-width:320px;"><div style="font-size:48px;margin-bottom:16px;">🔒</div><div style="font-size:20px;font-weight:700;margin-bottom:8px;">جهاز غير مسجّل</div><div style="font-size:14px;opacity:0.6;">هذا الرابط مقفل على جهاز سعود فقط</div></div>';
         wrap.appendChild(bl);
       }
       bl.style.display = 'flex';

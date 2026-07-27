@@ -1,4 +1,4 @@
-var CACHE_VERSION = 'v30';
+var CACHE_VERSION = 'v31';
 
 self.addEventListener('install', function(event) {
   self.skipWaiting();
