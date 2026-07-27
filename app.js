@@ -3187,7 +3187,7 @@
        PRESENCE ("in the conversation" indicator)
     ========================================================== */
     // How recent the other side's heartbeat must be to count as "online".
-    const PRESENCE_WINDOW = 45000;
+    const PRESENCE_WINDOW = 20000;
 
     // Heartbeat: while the chat is open and foregrounded, keep refreshing my own
     // "seen" timestamp (every 15s) and re-evaluate whether the other side is
