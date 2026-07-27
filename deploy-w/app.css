@@ -1471,3 +1471,16 @@
     .twenty-btn-sub { font-size: 11px; font-weight: 500; opacity: 0.8; }
     .twenty-hint { font-size: 12px; color: #f59e0b; margin-top: 2px; font-weight: 600; }
     .message-mine .twenty-hint { color: #fcd34d; }
+
+    /* Landscape block overlay */
+    .landscape-block {
+      display: none; position: fixed; inset: 0; z-index: 99999;
+      background: var(--bg); color: var(--accent);
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; font-size: 18px; font-weight: 600; text-align: center; padding: 24px;
+    }
+    .landscape-block svg { width: 64px; height: 64px; }
+    @media (orientation: landscape) and (max-height: 500px) {
+      .landscape-block { display: flex !important; }
+      #page-home, #page-chat, #image-viewer { display: none !important; }
+    }

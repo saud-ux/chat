@@ -47,6 +47,8 @@
       db.ref('.info/serverTimeOffset').on('value', s => { serverTimeOffset = s.val() || 0; });
     }
 
+    try { screen.orientation.lock('portrait').catch(function(){}); } catch(e) {}
+
     /* ==========================================================
        CONSTANTS
     ========================================================== */
