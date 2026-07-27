@@ -385,6 +385,8 @@
         updateUnreadForChat(chatId, homeUser);
       });
 
+      showNotifFirstTime();
+      updateNotifToggle();
       requestNotifPermission();
       listenForHomeNotifications(homeUser, chatPartners);
     }
@@ -846,20 +848,6 @@
       // fresh. We ride on the existing seen path (proven to sync both ways via
       // read receipts) so no new database rule is needed.
       startPresence();
-
-      // Show notification prompt if permission not granted
-      if ('Notification' in window && Notification.permission === 'default' && !localStorage.getItem('notif_dismissed_' + user)) {
-        const oldPrompt = document.getElementById('notif-prompt');
-        if (oldPrompt) oldPrompt.remove();
-        const prompt = document.createElement('div');
-        prompt.id = 'notif-prompt';
-        prompt.style.cssText = 'background:var(--accent);color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px;flex-shrink:0;';
-        prompt.innerHTML = '<span style="flex:1">فعّل الإشعارات لتصلك الرسائل</span>' +
-          '<button onclick="enableNotif()" style="background:rgba(255,255,255,0.25);border:none;color:#fff;padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;font-weight:600">تفعيل</button>' +
-          '<button onclick="dismissNotifPrompt()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;padding:2px 4px">✕</button>';
-        const header = $('chat-header');
-        header.parentNode.insertBefore(prompt, header.nextSibling);
-      }
 
       requestNotifPermission();
       setupInput();
@@ -1772,16 +1760,13 @@
     ========================================================== */
     function requestNotifPermission() {
       if (!('Notification' in window)) return;
-      if (Notification.permission === 'default') {
-        Notification.requestPermission().then(perm => {
-          if (perm === 'granted') subscribePush();
-        });
-      } else if (Notification.permission === 'granted') {
+      if (Notification.permission === 'granted' && !localStorage.getItem('notif_off')) {
         subscribePush();
       }
     }
 
     function notify(chatId, title, body) {
+      if (localStorage.getItem('notif_off')) return;
       if (currentView === 'chat' && currentChatId === chatId && !document.hidden) return;
       showToast(chatId, title, body);
       playSound();
@@ -3081,21 +3066,80 @@
     }
 
     /* ==========================================================
-       NOTIFICATION PROMPT
+       NOTIFICATION CONTROLS
     ========================================================== */
-    function enableNotif() {
+    function showNotifFirstTime() {
+      if (!('Notification' in window)) return;
+      if (localStorage.getItem('notif_asked')) return;
+      localStorage.setItem('notif_asked', '1');
+
+      const overlay = document.createElement('div');
+      overlay.id = 'notif-ask-overlay';
+      overlay.className = 'notif-ask-overlay';
+      overlay.innerHTML = `<div class="notif-ask-box">
+        <div class="notif-ask-icon">🔔</div>
+        <div class="notif-ask-title">تفعيل الإشعارات؟</div>
+        <div class="notif-ask-desc">عشان توصلك الرسائل أول بأول</div>
+        <div class="notif-ask-btns">
+          <button class="notif-ask-yes" onclick="notifAskYes()">تفعيل</button>
+          <button class="notif-ask-no" onclick="notifAskNo()">لا، شكراً</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+    }
+
+    function notifAskYes() {
+      const ov = document.getElementById('notif-ask-overlay');
+      if (ov) ov.remove();
+      localStorage.removeItem('notif_off');
       Notification.requestPermission().then(perm => {
         if (perm === 'granted') subscribePush();
-        const p = document.getElementById('notif-prompt');
-        if (p) p.remove();
+        updateNotifToggle();
       });
     }
 
-    function dismissNotifPrompt() {
-      const userId = currentUser || APP_USER;
-      if (userId) localStorage.setItem('notif_dismissed_' + userId, 'true');
-      const p = document.getElementById('notif-prompt');
-      if (p) p.remove();
+    function notifAskNo() {
+      const ov = document.getElementById('notif-ask-overlay');
+      if (ov) ov.remove();
+      localStorage.setItem('notif_off', '1');
+      updateNotifToggle();
+    }
+
+    function toggleNotifications() {
+      if (localStorage.getItem('notif_off')) {
+        localStorage.removeItem('notif_off');
+        if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission().then(perm => {
+            if (perm === 'granted') subscribePush();
+            updateNotifToggle();
+          });
+        } else if ('Notification' in window && Notification.permission === 'granted') {
+          subscribePush();
+          updateNotifToggle();
+        } else {
+          updateNotifToggle();
+        }
+      } else {
+        localStorage.setItem('notif_off', '1');
+        updateNotifToggle();
+      }
+    }
+
+    function updateNotifToggle() {
+      const btn = $('btn-notif-toggle');
+      if (!btn) return;
+      const isOff = !!localStorage.getItem('notif_off');
+      const denied = 'Notification' in window && Notification.permission === 'denied';
+      if (denied) {
+        btn.innerHTML = '🔕';
+        btn.title = 'الإشعارات محظورة من المتصفح';
+      } else if (isOff) {
+        btn.innerHTML = '🔕';
+        btn.title = 'الإشعارات مطفية';
+      } else {
+        btn.innerHTML = '🔔';
+        btn.title = 'الإشعارات مفعّلة';
+      }
     }
 
     /* ==========================================================
