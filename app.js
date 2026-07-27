@@ -441,6 +441,7 @@
           const msg = snap.val();
           if (msg.sender !== user) {
             notify(chatId, CONTACTS[partner].name, msgPreview(msg));
+            speakMessage(msgPreview(msg));
           }
         });
       });
@@ -766,6 +767,9 @@
             const name = CONTACTS[partnerId].name;
             notify(chatId, name, msgPreview(lastOtherMsg));
           }
+        }
+        if (hasOther && lastOtherMsg && !isFirstLoad[chatId]) {
+          speakMessage(msgPreview(lastOtherMsg));
         }
       }
 
@@ -1839,6 +1843,14 @@
         g2.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
         osc2.start(now + 0.1); osc2.stop(now + 0.25);
       } catch(e) {}
+    }
+
+    function speakMessage(text) {
+      if (!text || !window.speechSynthesis) return;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'ar-SA';
+      utter.rate = 1;
+      speechSynthesis.speak(utter);
     }
 
     function sendPush(chatId, preview) {
