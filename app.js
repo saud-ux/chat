@@ -3199,7 +3199,7 @@
       presenceTimer = setInterval(() => {
         markSeen();
         refreshPresenceView();
-      }, 15000);
+      }, 5000);
     }
 
     function stopPresence() {
