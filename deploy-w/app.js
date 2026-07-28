@@ -1556,9 +1556,28 @@
       const d = (currentAudioEl.duration && isFinite(currentAudioEl.duration)) ? currentAudioEl.duration : storedDur;
       if (!d) return;
       const rect = wave.getBoundingClientRect();
-      let ratio = (rect.right - e.clientX) / rect.width;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      let ratio = (rect.right - clientX) / rect.width;
       ratio = Math.max(0, Math.min(1, ratio));
       currentAudioEl.currentTime = ratio * d;
+      paintWavePlayed(wrap, ratio);
+    }
+
+    function initWaveTouch(wave) {
+      let dragging = false;
+      wave.addEventListener('touchstart', (e) => {
+        const wrap = wave.closest('.msg-audio');
+        if (!wrap || !currentAudioEl || !currentAudioBtn || currentAudioBtn.closest('.msg-audio') !== wrap) return;
+        dragging = true;
+        seekAudio(e, wave);
+      }, { passive: true });
+      wave.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        e.preventDefault();
+        seekAudio(e, wave);
+      }, { passive: false });
+      wave.addEventListener('touchend', () => { dragging = false; });
+      wave.addEventListener('touchcancel', () => { dragging = false; });
     }
 
     function compressImageToDataUrl(file, maxWidth = 1280) {
@@ -2079,6 +2098,8 @@
       const statusHtml = isMine ? `<span class="msg-status">${TICK_SINGLE}</span>` : '';
       const savedTag = (el.dataset.key && isSaved(el.dataset.key)) ? '<span class="msg-saved-star">⭐</span>' : '';
       el.innerHTML = replyHtml + content + reactionsHtml + `<div class="msg-time">${savedTag}${editedTag}${formatTime(msg.timestamp)}${statusHtml}</div>`;
+      const waveEl = el.querySelector('.audio-wave');
+      if (waveEl) initWaveTouch(waveEl);
     }
 
     /* ==========================================================
