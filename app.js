@@ -268,6 +268,7 @@
       clearInterval(typingCheckInterval);
       activeListeners.forEach(({ ref, event, cb }) => ref.off(event, cb));
       activeListeners = [];
+      homeNotifListening = false;
       clearPendingMedia();
       if (mediaRecorder) stopRecording(false);
       releaseMic();
@@ -427,10 +428,14 @@
           updateTitleBadge();
         }
       });
-      startRef.once('value', () => { initial = false; });
+      liveRef.once('value', () => { initial = false; });
     }
 
+    let homeNotifListening = false;
+
     function listenForHomeNotifications(user, partners) {
+      if (homeNotifListening) return;
+      homeNotifListening = true;
       user = user || 'saud';
       partners.forEach(partner => {
         const chatId = getChatId(user, partner);
@@ -1491,6 +1496,9 @@
 
       el._cleanup = () => {
         try {
+          el.pause();
+          el.src = '';
+          el.load();
           if (el._audioSource) { el._audioSource.disconnect(); el._audioSource = null; }
           if (el._gainNode) { el._gainNode.disconnect(); el._gainNode = null; }
           el.remove();
@@ -1592,6 +1600,9 @@
         video.preload = 'auto';
 
         var timeout = setTimeout(() => {
+          video.pause();
+          video.src = '';
+          video.load();
           fileToDataUrl(file).then(resolve).catch(reject);
         }, 120000);
 
@@ -1611,10 +1622,11 @@
           const ctx = canvas.getContext('2d');
 
           const stream = canvas.captureStream(30);
+          var compressAudioCtx = null;
           try {
-            const audioCtx2 = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioCtx2.createMediaElementSource(video);
-            const dest = audioCtx2.createMediaStreamDestination();
+            compressAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const source = compressAudioCtx.createMediaElementSource(video);
+            const dest = compressAudioCtx.createMediaStreamDestination();
             source.connect(dest);
             dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
           } catch(e) {}
@@ -1627,6 +1639,9 @@
           recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
           recorder.onstop = () => {
             clearTimeout(timeout);
+            if (compressAudioCtx) { try { compressAudioCtx.close(); } catch(e) {} }
+            video.src = '';
+            video.load();
             const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
@@ -1847,6 +1862,7 @@
 
     function speakMessage(text) {
       if (!text || !window.speechSynthesis) return;
+      speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'ar-SA';
       utter.rate = 1;
@@ -1854,6 +1870,7 @@
     }
 
     function sendPush(chatId, preview) {
+      pruneOldMessages(chatId);
       const senderName = currentUser === 'saud' ? 'سعود' : (CONTACTS[currentUser] ? CONTACTS[currentUser].name : currentUser);
       const partnerId = getPartnerId(chatId, currentUser);
 
@@ -1880,6 +1897,30 @@
           }).catch(() => {});
         });
       });
+    }
+
+    const MSG_LIMIT = 200;
+    let pruneInFlight = {};
+
+    function pruneOldMessages(chatId) {
+      if (!chatId || !db || pruneInFlight[chatId]) return;
+      pruneInFlight[chatId] = true;
+      const ref = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp');
+      ref.once('value', snap => {
+        const total = snap.numChildren();
+        if (total <= MSG_LIMIT) { pruneInFlight[chatId] = false; return; }
+        const toDelete = total - MSG_LIMIT;
+        let deleted = 0;
+        const updates = {};
+        snap.forEach(child => {
+          if (deleted >= toDelete) return true;
+          updates[child.key] = null;
+          deleted++;
+        });
+        db.ref(`chats/${chatId}/messages`).update(updates, () => {
+          pruneInFlight[chatId] = false;
+        });
+      }, () => { pruneInFlight[chatId] = false; });
     }
 
     function updateTitleBadge() {
@@ -3187,7 +3228,7 @@
        PRESENCE ("in the conversation" indicator)
     ========================================================== */
     // How recent the other side's heartbeat must be to count as "online".
-    const PRESENCE_WINDOW = 10000;
+    const PRESENCE_WINDOW = 20000;
 
     // Heartbeat: while the chat is open and foregrounded, keep refreshing my own
     // "seen" timestamp (every 15s) and re-evaluate whether the other side is
@@ -3199,7 +3240,7 @@
       presenceTimer = setInterval(() => {
         markSeen();
         refreshPresenceView();
-      }, 5000);
+      }, 15000);
     }
 
     function stopPresence() {
@@ -3228,8 +3269,9 @@
     /* ==========================================================
        WEB PUSH NOTIFICATIONS
     ========================================================== */
-    function subscribePush() {
+    function subscribePush(retries) {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      retries = retries || 0;
 
       navigator.serviceWorker.ready.then(reg => {
         reg.pushManager.getSubscription().then(sub => {
@@ -3243,7 +3285,9 @@
             applicationServerKey: convertedKey
           }).then(newSub => {
             savePushSubscription(newSub);
-          }).catch(() => {});
+          }).catch(() => {
+            if (retries < 2) setTimeout(() => subscribePush(retries + 1), 3000);
+          });
         });
       });
     }
@@ -3254,19 +3298,15 @@
       navigator.serviceWorker.ready.then(reg => {
         reg.pushManager.getSubscription().then(sub => {
           if (!sub) {
-            const convertedKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-            reg.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: convertedKey
-            }).then(newSub => {
-              savePushSubscription(newSub);
-            }).catch(() => {});
+            subscribePush();
           } else {
             savePushSubscription(sub);
           }
         });
       });
     }
+
+    setInterval(resubscribePushIfNeeded, 1800000);
 
     function savePushSubscription(sub) {
       if (!db) return;
@@ -3386,13 +3426,19 @@
     }
 
     // TikTok-style burst of floating hearts when a message is double-tapped.
+    let activeHearts = 0;
+    const MAX_HEARTS = 18;
+
     function burstHearts(el) {
       if (!el) return;
+      if (activeHearts >= MAX_HEARTS) return;
       if (navigator.vibrate) navigator.vibrate(14);
       const rect = el.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
       for (let i = 0; i < 6; i++) {
+        if (activeHearts >= MAX_HEARTS) break;
+        activeHearts++;
         const h = document.createElement('div');
         h.className = 'heart-float';
         h.textContent = '❤️';
@@ -3403,7 +3449,7 @@
         h.style.setProperty('--sc', (0.7 + Math.random() * 0.7).toFixed(2));
         h.style.animationDelay = Math.round(Math.random() * 130) + 'ms';
         document.body.appendChild(h);
-        setTimeout(() => h.remove(), 1300);
+        setTimeout(() => { h.remove(); activeHearts--; }, 1300);
       }
     }
 
@@ -3883,34 +3929,20 @@
       });
     }
 
-    function setWallpaperImage(input) {
+    async function setWallpaperImage(input) {
       const file = input.files[0];
       if (!file) return;
       input.value = '';
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxW = 1080;
-          let w = img.width, h = img.height;
-          if (w > maxW) { h = Math.round((maxW / w) * h); w = maxW; }
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-          try {
-            db.ref(`chats/${currentChatId}/wallpaper`).set(dataUrl);
-          } catch(e) {
-            alert('الصورة كبيرة جداً، اختر صورة أصغر');
-            return;
-          }
-          const settingsOverlay = document.getElementById('settings-overlay');
-          if (settingsOverlay) settingsOverlay.remove();
-          openSettings();
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImageToDataUrl(file, 1080);
+        const url = await uploadToCloudinary(compressed);
+        db.ref(`chats/${currentChatId}/wallpaper`).set(url);
+        const settingsOverlay = document.getElementById('settings-overlay');
+        if (settingsOverlay) settingsOverlay.remove();
+        openSettings();
+      } catch(e) {
+        alert('فشل رفع الخلفية، حاول مرة أخرى');
+      }
     }
 
     function resetWallpaperImg() {
@@ -3942,20 +3974,27 @@
        INIT
     ========================================================== */
     if ('serviceWorker' in navigator) {
+      var swReloading = false;
+      function swReload() {
+        if (swReloading) return;
+        swReloading = true;
+        window.location.reload();
+      }
       navigator.serviceWorker.register('/sw.js').then(function(reg) {
         reg.addEventListener('updatefound', function() {
           var newWorker = reg.installing;
+          if (!newWorker) return;
           newWorker.addEventListener('statechange', function() {
-            if (newWorker.state === 'activated') {
-              window.location.reload();
+            if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+              swReload();
             }
           });
         });
-        setInterval(function() { reg.update(); }, 60000);
+        setInterval(function() { reg.update(); }, 300000);
       }).catch(() => {});
       navigator.serviceWorker.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'SW_UPDATED') {
-          window.location.reload();
+          swReload();
         }
       });
     }
@@ -3968,7 +4007,6 @@
     // sender's tick flips to double without waiting for a new message.
     document.addEventListener('visibilitychange', function() {
       if (!document.hidden) {
-        if (db) { db.goOffline(); db.goOnline(); }
         markSeen();
         if (currentChatId && currentUser && db) startPresence();
         resubscribePushIfNeeded();
