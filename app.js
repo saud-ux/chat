@@ -1549,9 +1549,17 @@
       audio.play().catch(() => {});
     }
 
+    function ensureAudioPlaying(wrap) {
+      if (currentAudioEl && currentAudioBtn && currentAudioBtn.closest('.msg-audio') === wrap) return true;
+      const btn = wrap.querySelector('.audio-play');
+      if (btn) { toggleAudioPlay(btn); return true; }
+      return false;
+    }
+
     function seekAudio(e, wave) {
       const wrap = wave.closest('.msg-audio');
-      if (!wrap || !currentAudioEl || !currentAudioBtn || currentAudioBtn.closest('.msg-audio') !== wrap) return;
+      if (!wrap) return;
+      if (!ensureAudioPlaying(wrap)) return;
       const storedDur = parseFloat(wrap.getAttribute('data-dur')) || 0;
       const d = (currentAudioEl.duration && isFinite(currentAudioEl.duration)) ? currentAudioEl.duration : storedDur;
       if (!d) return;
@@ -1566,8 +1574,6 @@
     function initWaveTouch(wave) {
       let dragging = false;
       wave.addEventListener('touchstart', (e) => {
-        const wrap = wave.closest('.msg-audio');
-        if (!wrap || !currentAudioEl || !currentAudioBtn || currentAudioBtn.closest('.msg-audio') !== wrap) return;
         dragging = true;
         seekAudio(e, wave);
       }, { passive: true });
