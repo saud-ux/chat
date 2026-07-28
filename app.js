@@ -1468,15 +1468,14 @@
     }
 
     function createSpeakerAudio(src) {
-      const el = document.createElement('video');
+      const el = document.createElement('audio');
       el.setAttribute('playsinline', '');
-      el.setAttribute('webkit-playsinline', '');
       el.crossOrigin = 'anonymous';
       el.preload = 'auto';
       el.volume = 1.0;
       el.muted = false;
-      el.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;opacity:0;pointer-events:none;';
       el.src = src;
+      el.style.cssText = 'position:fixed;top:-9999px;left:-9999px;';
       document.body.appendChild(el);
 
       try {
