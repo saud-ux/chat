@@ -40,7 +40,7 @@ exports.handler = async function(event) {
     });
 
     const options = {
-      TTL: 60 * 60,
+      TTL: 86400,
       urgency: 'high'
     };
 

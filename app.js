@@ -1496,6 +1496,9 @@
 
       el._cleanup = () => {
         try {
+          el.pause();
+          el.src = '';
+          el.load();
           if (el._audioSource) { el._audioSource.disconnect(); el._audioSource = null; }
           if (el._gainNode) { el._gainNode.disconnect(); el._gainNode = null; }
           el.remove();
@@ -3266,8 +3269,9 @@
     /* ==========================================================
        WEB PUSH NOTIFICATIONS
     ========================================================== */
-    function subscribePush() {
+    function subscribePush(retries) {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      retries = retries || 0;
 
       navigator.serviceWorker.ready.then(reg => {
         reg.pushManager.getSubscription().then(sub => {
@@ -3281,7 +3285,9 @@
             applicationServerKey: convertedKey
           }).then(newSub => {
             savePushSubscription(newSub);
-          }).catch(() => {});
+          }).catch(() => {
+            if (retries < 2) setTimeout(() => subscribePush(retries + 1), 3000);
+          });
         });
       });
     }
@@ -3292,19 +3298,15 @@
       navigator.serviceWorker.ready.then(reg => {
         reg.pushManager.getSubscription().then(sub => {
           if (!sub) {
-            const convertedKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-            reg.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: convertedKey
-            }).then(newSub => {
-              savePushSubscription(newSub);
-            }).catch(() => {});
+            subscribePush();
           } else {
             savePushSubscription(sub);
           }
         });
       });
     }
+
+    setInterval(resubscribePushIfNeeded, 1800000);
 
     function savePushSubscription(sub) {
       if (!db) return;
@@ -3424,13 +3426,19 @@
     }
 
     // TikTok-style burst of floating hearts when a message is double-tapped.
+    let activeHearts = 0;
+    const MAX_HEARTS = 18;
+
     function burstHearts(el) {
       if (!el) return;
+      if (activeHearts >= MAX_HEARTS) return;
       if (navigator.vibrate) navigator.vibrate(14);
       const rect = el.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
       for (let i = 0; i < 6; i++) {
+        if (activeHearts >= MAX_HEARTS) break;
+        activeHearts++;
         const h = document.createElement('div');
         h.className = 'heart-float';
         h.textContent = '❤️';
@@ -3441,7 +3449,7 @@
         h.style.setProperty('--sc', (0.7 + Math.random() * 0.7).toFixed(2));
         h.style.animationDelay = Math.round(Math.random() * 130) + 'ms';
         document.body.appendChild(h);
-        setTimeout(() => h.remove(), 1300);
+        setTimeout(() => { h.remove(); activeHearts--; }, 1300);
       }
     }
 
@@ -3921,34 +3929,20 @@
       });
     }
 
-    function setWallpaperImage(input) {
+    async function setWallpaperImage(input) {
       const file = input.files[0];
       if (!file) return;
       input.value = '';
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxW = 1080;
-          let w = img.width, h = img.height;
-          if (w > maxW) { h = Math.round((maxW / w) * h); w = maxW; }
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-          try {
-            db.ref(`chats/${currentChatId}/wallpaper`).set(dataUrl);
-          } catch(e) {
-            alert('الصورة كبيرة جداً، اختر صورة أصغر');
-            return;
-          }
-          const settingsOverlay = document.getElementById('settings-overlay');
-          if (settingsOverlay) settingsOverlay.remove();
-          openSettings();
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImageToDataUrl(file, 1080);
+        const url = await uploadToCloudinary(compressed);
+        db.ref(`chats/${currentChatId}/wallpaper`).set(url);
+        const settingsOverlay = document.getElementById('settings-overlay');
+        if (settingsOverlay) settingsOverlay.remove();
+        openSettings();
+      } catch(e) {
+        alert('فشل رفع الخلفية، حاول مرة أخرى');
+      }
     }
 
     function resetWallpaperImg() {
