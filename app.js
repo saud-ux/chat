@@ -1862,6 +1862,7 @@
     }
 
     function sendPush(chatId, preview) {
+      pruneOldMessages(chatId);
       const senderName = currentUser === 'saud' ? 'سعود' : (CONTACTS[currentUser] ? CONTACTS[currentUser].name : currentUser);
       const partnerId = getPartnerId(chatId, currentUser);
 
@@ -1888,6 +1889,30 @@
           }).catch(() => {});
         });
       });
+    }
+
+    const MSG_LIMIT = 200;
+    let pruneInFlight = {};
+
+    function pruneOldMessages(chatId) {
+      if (!chatId || !db || pruneInFlight[chatId]) return;
+      pruneInFlight[chatId] = true;
+      const ref = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp');
+      ref.once('value', snap => {
+        const total = snap.numChildren();
+        if (total <= MSG_LIMIT) { pruneInFlight[chatId] = false; return; }
+        const toDelete = total - MSG_LIMIT;
+        let deleted = 0;
+        const updates = {};
+        snap.forEach(child => {
+          if (deleted >= toDelete) return true;
+          updates[child.key] = null;
+          deleted++;
+        });
+        db.ref(`chats/${chatId}/messages`).update(updates, () => {
+          pruneInFlight[chatId] = false;
+        });
+      }, () => { pruneInFlight[chatId] = false; });
     }
 
     function updateTitleBadge() {
