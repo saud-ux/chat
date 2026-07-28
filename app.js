@@ -446,7 +446,6 @@
           const msg = snap.val();
           if (msg.sender !== user) {
             notify(chatId, CONTACTS[partner].name, msgPreview(msg));
-            speakMessage(msgPreview(msg));
           }
         });
       });
@@ -772,9 +771,6 @@
             const name = CONTACTS[partnerId].name;
             notify(chatId, name, msgPreview(lastOtherMsg));
           }
-        }
-        if (hasOther && lastOtherMsg && !isFirstLoad[chatId]) {
-          speakMessage(msgPreview(lastOtherMsg));
         }
       }
 
@@ -1860,14 +1856,6 @@
       } catch(e) {}
     }
 
-    function speakMessage(text) {
-      if (!text || !window.speechSynthesis) return;
-      speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'ar-SA';
-      utter.rate = 1;
-      speechSynthesis.speak(utter);
-    }
 
     function sendPush(chatId, preview) {
       pruneOldMessages(chatId);
