@@ -3315,10 +3315,10 @@
        PRESENCE ("in the conversation" indicator)
     ========================================================== */
     // How recent the other side's heartbeat must be to count as "online".
-    const PRESENCE_WINDOW = 20000;
+    const PRESENCE_WINDOW = 10000;
 
     // Heartbeat: while the chat is open and foregrounded, keep refreshing my own
-    // "seen" timestamp (every 15s) and re-evaluate whether the other side is
+    // "seen" timestamp (every 5s) and re-evaluate whether the other side is
     // still fresh. markSeen() already guards document.hidden and no-op cases.
     function startPresence() {
       clearInterval(presenceTimer);
@@ -3327,7 +3327,7 @@
       presenceTimer = setInterval(() => {
         markSeen();
         refreshPresenceView();
-      }, 15000);
+      }, 5000);
     }
 
     function stopPresence() {
