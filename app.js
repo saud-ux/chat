@@ -3217,69 +3217,52 @@
     /* ==========================================================
        NOTIFICATION CONTROLS
     ========================================================== */
+    // Trigger the browser's NATIVE permission prompt on the first user
+    // interaction. iOS Safari requires a user gesture, so we can't ask on load.
+    // Attaching once in capture phase means the very first tap/click anywhere
+    // fires it, before it can even be handled as a normal UI interaction.
     function showNotifFirstTime() {
       if (!('Notification' in window)) return;
       if (localStorage.getItem('notif_asked')) return;
-      localStorage.setItem('notif_asked', '1');
-
-      const overlay = document.createElement('div');
-      overlay.id = 'notif-ask-overlay';
-      overlay.className = 'notif-ask-overlay';
-      overlay.innerHTML = `<div class="notif-ask-box">
-        <div class="notif-ask-icon">🔔</div>
-        <div class="notif-ask-title">تفعيل الإشعارات؟</div>
-        <div class="notif-ask-desc">عشان توصلك الرسائل أول بأول</div>
-        <div class="notif-ask-btns">
-          <button class="notif-ask-yes" onclick="notifAskYes()">تفعيل</button>
-          <button class="notif-ask-no" onclick="notifAskNo()">لا، شكراً</button>
-        </div>
-      </div>`;
-      document.body.appendChild(overlay);
-    }
-
-    function notifAskYes() {
-      const ov = document.getElementById('notif-ask-overlay');
-      if (ov) ov.remove();
-      localStorage.removeItem('notif_off');
-      Notification.requestPermission().then(perm => {
-        if (perm === 'granted') subscribePush();
-        updateNotifToggle();
-      });
-    }
-
-    function notifAskNo() {
-      const ov = document.getElementById('notif-ask-overlay');
-      if (ov) ov.remove();
-      localStorage.setItem('notif_off', '1');
-      updateNotifToggle();
+      if (Notification.permission !== 'default') {
+        localStorage.setItem('notif_asked', '1');
+        return;
+      }
+      const askOnce = () => {
+        document.removeEventListener('touchend', askOnce, true);
+        document.removeEventListener('click', askOnce, true);
+        localStorage.setItem('notif_asked', '1');
+        localStorage.removeItem('notif_off');
+        try {
+          Notification.requestPermission().then(perm => {
+            if (perm === 'granted') subscribePush();
+            updateNotifToggle();
+          });
+        } catch(e) {}
+      };
+      document.addEventListener('touchend', askOnce, true);
+      document.addEventListener('click', askOnce, true);
     }
 
     function toggleNotifications() {
-      if (localStorage.getItem('notif_off')) {
-        showNotifDialog();
+      if (!('Notification' in window)) return;
+      const isOff = !!localStorage.getItem('notif_off');
+      const perm = Notification.permission;
+      if (perm === 'default' || isOff) {
+        // Fire the native OS prompt directly — this call itself is a user
+        // gesture (the toggle button was tapped).
+        localStorage.removeItem('notif_off');
+        localStorage.setItem('notif_asked', '1');
+        try {
+          Notification.requestPermission().then(p => {
+            if (p === 'granted') subscribePush();
+            updateNotifToggle();
+          });
+        } catch(e) {}
       } else {
         localStorage.setItem('notif_off', '1');
         updateNotifToggle();
       }
-    }
-
-    function showNotifDialog() {
-      if (!('Notification' in window)) return;
-      const old = document.getElementById('notif-ask-overlay');
-      if (old) old.remove();
-      const overlay = document.createElement('div');
-      overlay.id = 'notif-ask-overlay';
-      overlay.className = 'notif-ask-overlay';
-      overlay.innerHTML = `<div class="notif-ask-box">
-        <div class="notif-ask-icon">🔔</div>
-        <div class="notif-ask-title">تفعيل الإشعارات؟</div>
-        <div class="notif-ask-desc">عشان توصلك الرسائل أول بأول</div>
-        <div class="notif-ask-btns">
-          <button class="notif-ask-yes" onclick="notifAskYes()">تفعيل</button>
-          <button class="notif-ask-no" onclick="notifAskNo()">لا، شكراً</button>
-        </div>
-      </div>`;
-      document.body.appendChild(overlay);
     }
 
     function updateNotifToggle() {
