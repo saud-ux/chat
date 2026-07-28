@@ -1,4 +1,4 @@
-var CACHE_VERSION = 'v36';
+var CACHE_VERSION = 'v37';
 
 self.addEventListener('install', function(event) {
   self.skipWaiting();
@@ -34,6 +34,11 @@ self.addEventListener('fetch', function(event) {
   );
 });
 
+function normalizePath(p) {
+  var s = (p || '/').replace(/\/+$/, '');
+  return s || '/';
+}
+
 self.addEventListener('push', function(event) {
   var data = { title: 'رسالة جديدة', body: '' };
   if (event.data) {
@@ -47,11 +52,31 @@ self.addEventListener('push', function(event) {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       var targetUrl = data.url || '/';
-      for (var i = 0; i < clientList.length; i++) {
-        if (clientList[i].visibilityState === 'visible' && clientList[i].url.indexOf(targetUrl) !== -1) {
-          return;
+      var targetPath;
+      try { targetPath = normalizePath(new URL(targetUrl, self.location.origin).pathname); }
+      catch(e) { targetPath = normalizePath(targetUrl); }
+
+      // Only suppress the OS notification when a VISIBLE tab is on the exact
+      // same chat page. Substring matching would suppress on any page
+      // containing '/', which used to swallow notifications in the fallback
+      // case. Also skip suppression for a generic '/' target — always show.
+      if (targetPath !== '/') {
+        for (var i = 0; i < clientList.length; i++) {
+          if (clientList[i].visibilityState === 'visible') {
+            var cp;
+            try { cp = normalizePath(new URL(clientList[i].url).pathname); }
+            catch(e) { cp = ''; }
+            if (cp === targetPath) return;
+          }
         }
       }
+
+      // Per-message unique tag so rapid messages don't collapse the previous
+      // notification. Prefer an id supplied by the sender for idempotency
+      // (same push retried by a fallback delivery won't stack twice); fall
+      // back to a random tag when no id is provided.
+      var tag = 'msg-' + (data.msgId || (Date.now() + '-' + Math.random().toString(36).slice(2, 8)));
+
       return self.registration.showNotification(data.title, {
         body: data.body,
         icon: '/icon-192.svg',
@@ -59,7 +84,7 @@ self.addEventListener('push', function(event) {
         dir: 'rtl',
         lang: 'ar',
         vibrate: [200, 100, 200],
-        tag: 'chat-' + (data.title || 'msg'),
+        tag: tag,
         renotify: true,
         requireInteraction: false,
         actions: [
