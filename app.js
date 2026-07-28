@@ -268,6 +268,7 @@
       clearInterval(typingCheckInterval);
       activeListeners.forEach(({ ref, event, cb }) => ref.off(event, cb));
       activeListeners = [];
+      homeNotifListening = false;
       clearPendingMedia();
       if (mediaRecorder) stopRecording(false);
       releaseMic();
@@ -430,7 +431,11 @@
       liveRef.once('value', () => { initial = false; });
     }
 
+    let homeNotifListening = false;
+
     function listenForHomeNotifications(user, partners) {
+      if (homeNotifListening) return;
+      homeNotifListening = true;
       user = user || 'saud';
       partners.forEach(partner => {
         const chatId = getChatId(user, partner);
