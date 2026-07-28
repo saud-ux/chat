@@ -3148,22 +3148,30 @@
 
     function toggleNotifications() {
       if (localStorage.getItem('notif_off')) {
-        localStorage.removeItem('notif_off');
-        if ('Notification' in window && Notification.permission === 'default') {
-          Notification.requestPermission().then(perm => {
-            if (perm === 'granted') subscribePush();
-            updateNotifToggle();
-          });
-        } else if ('Notification' in window && Notification.permission === 'granted') {
-          subscribePush();
-          updateNotifToggle();
-        } else {
-          updateNotifToggle();
-        }
+        showNotifDialog();
       } else {
         localStorage.setItem('notif_off', '1');
         updateNotifToggle();
       }
+    }
+
+    function showNotifDialog() {
+      if (!('Notification' in window)) return;
+      const old = document.getElementById('notif-ask-overlay');
+      if (old) old.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'notif-ask-overlay';
+      overlay.className = 'notif-ask-overlay';
+      overlay.innerHTML = `<div class="notif-ask-box">
+        <div class="notif-ask-icon">🔔</div>
+        <div class="notif-ask-title">تفعيل الإشعارات؟</div>
+        <div class="notif-ask-desc">عشان توصلك الرسائل أول بأول</div>
+        <div class="notif-ask-btns">
+          <button class="notif-ask-yes" onclick="notifAskYes()">تفعيل</button>
+          <button class="notif-ask-no" onclick="notifAskNo()">لا، شكراً</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
     }
 
     function updateNotifToggle() {
