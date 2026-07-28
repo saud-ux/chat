@@ -390,6 +390,7 @@
       updateNotifToggle();
       requestNotifPermission();
       listenForHomeNotifications(homeUser, chatPartners);
+      processPendingPushes();
     }
 
     function updateUnreadForChat(chatId, user) {
@@ -1818,9 +1819,9 @@
       if (currentView === 'chat' && currentChatId === chatId && !document.hidden) return;
       showToast(chatId, title, body);
       playSound();
-      if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-        try { new Notification(title, { body, icon: '/icon-192.svg' }); } catch(e) {}
-      }
+      // OS-level notifications go through the service worker's push handler.
+      // The in-page Notification API is unreliable on mobile and duplicated the
+      // SW notification, so it was removed here.
     }
 
     let toastTimer = null;
@@ -1897,28 +1898,100 @@
 
       const recipientUrl = partnerId === 'saud' ? `/chat/${chatId}` : `/${partnerId}/chat/${currentUser === 'saud' ? 'saud' : (chatId === 'w-aseel' ? (partnerId === 'w' ? 'aseel' : 'w') : 'saud')}`;
 
+      // Stable per-message id so a retry (from the sender or a pending-push
+      // drain by another client) doesn't stack two notifications on the phone.
+      const msgId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+
       db.ref(`push-subscriptions/${partnerId}`).once('value', snap => {
         const subs = snap.val();
         if (!subs) return;
         Object.entries(subs).forEach(([subKey, sub]) => {
-          fetch('/.netlify/functions/send-push', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            keepalive: true,
-            body: JSON.stringify({
-              subscription: sub,
-              title: senderName,
-              body: preview,
-              url: recipientUrl
-            })
-          }).then(res => {
-            if (res.status === 410 || res.status === 404) {
-              db.ref(`push-subscriptions/${partnerId}/${subKey}`).remove();
-            }
-          }).catch(() => {});
+          const payload = {
+            subscription: sub,
+            title: senderName,
+            body: preview,
+            url: recipientUrl,
+            msgId: msgId
+          };
+          deliverPush(partnerId, subKey, payload, 0);
         });
       });
     }
+
+    // POST the push to the netlify function with retry+backoff. If every retry
+    // fails (netlify cold-start, sender's flaky network), persist to
+    // pending-pushes so any client — including the sender's next visit or
+    // another user's browser — can drain it later. Web-push delivery inside
+    // the same msgId is idempotent on the phone (tag stays the same).
+    function deliverPush(partnerId, subKey, payload, attempt) {
+      attempt = attempt || 0;
+      fetch('/.netlify/functions/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify(payload)
+      }).then(res => {
+        if (res.status === 410 || res.status === 404) {
+          // Subscription is dead — clear it AND the pending queue entry if any.
+          if (partnerId && subKey) db.ref(`push-subscriptions/${partnerId}/${subKey}`).remove();
+          return;
+        }
+        if (!res.ok) throw new Error('push status ' + res.status);
+      }).catch(() => {
+        if (attempt < 3) {
+          const delay = 800 * Math.pow(2, attempt); // 800ms, 1.6s, 3.2s
+          setTimeout(() => deliverPush(partnerId, subKey, payload, attempt + 1), delay);
+        } else if (partnerId && db) {
+          try {
+            db.ref(`pending-pushes/${partnerId}`).push({
+              payload: payload,
+              subKey: subKey || null,
+              ts: firebase.database.ServerValue.TIMESTAMP
+            });
+          } catch(e) {}
+        }
+      });
+    }
+
+    // Drain any pushes that a previous send couldn't deliver. Any online
+    // client will process the queue on load and then every 5 minutes while
+    // running. Entries older than 30 minutes are dropped so a permanent
+    // failure doesn't keep firing stale notifications.
+    let pendingDrainInFlight = false;
+
+    function processPendingPushes() {
+      if (!db || pendingDrainInFlight) return;
+      pendingDrainInFlight = true;
+      const users = ['saud', 'w', 'aseel'];
+      let remaining = users.length;
+      const done = () => { if (--remaining <= 0) pendingDrainInFlight = false; };
+      users.forEach(uid => {
+        db.ref(`pending-pushes/${uid}`).limitToFirst(20).once('value', snap => {
+          const items = [];
+          snap.forEach(c => { items.push({ ref: c.ref, val: c.val() }); });
+          if (!items.length) { done(); return; }
+          items.forEach(({ ref, val }) => {
+            if (!val || !val.payload) { ref.remove(); return; }
+            if (val.ts && (Date.now() - val.ts) > 1800000) { ref.remove(); return; }
+            fetch('/.netlify/functions/send-push', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(val.payload)
+            }).then(res => {
+              if (res.ok || res.status === 410 || res.status === 404) {
+                ref.remove();
+                if ((res.status === 410 || res.status === 404) && val.subKey) {
+                  db.ref(`push-subscriptions/${uid}/${val.subKey}`).remove();
+                }
+              }
+            }).catch(() => {});
+          });
+          done();
+        }, () => done());
+      });
+    }
+
+    setInterval(processPendingPushes, 300000);
 
     const MSG_LIMIT = 200;
     let pruneInFlight = {};
