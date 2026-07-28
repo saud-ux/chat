@@ -1481,10 +1481,18 @@
       try {
         const ctx = getSpeakerCtx();
         const source = ctx.createMediaElementSource(el);
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.value = -30;
+        compressor.knee.value = 20;
+        compressor.ratio.value = 8;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.15;
         const gain = ctx.createGain();
-        gain.gain.value = 2.0;
-        source.connect(gain);
+        gain.gain.value = 4.0;
+        source.connect(compressor);
+        compressor.connect(gain);
         gain.connect(ctx.destination);
+        el._compressor = compressor;
         el._gainNode = gain;
         el._audioSource = source;
       } catch(e) {}
@@ -1495,6 +1503,7 @@
           el.src = '';
           el.load();
           if (el._audioSource) { el._audioSource.disconnect(); el._audioSource = null; }
+          if (el._compressor) { el._compressor.disconnect(); el._compressor = null; }
           if (el._gainNode) { el._gainNode.disconnect(); el._gainNode = null; }
           el.remove();
         } catch(e) {}
