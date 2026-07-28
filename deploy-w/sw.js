@@ -1,4 +1,4 @@
-var CACHE_VERSION = 'v35';
+var CACHE_VERSION = 'v36';
 
 self.addEventListener('install', function(event) {
   self.skipWaiting();
@@ -46,8 +46,9 @@ self.addEventListener('push', function(event) {
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      var targetUrl = data.url || '/';
       for (var i = 0; i < clientList.length; i++) {
-        if (clientList[i].visibilityState === 'visible') {
+        if (clientList[i].visibilityState === 'visible' && clientList[i].url.indexOf(targetUrl) !== -1) {
           return;
         }
       }
