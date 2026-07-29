@@ -2232,7 +2232,7 @@
       const deletedTag = msg.deleted ? '<span class="msg-deleted-tag">🚫 محذوفة</span>' : '';
       const statusHtml = (isMine && !msg.deleted) ? `<span class="msg-status">${TICK_SINGLE}</span>` : '';
       const savedTag = (el.dataset.key && isSaved(el.dataset.key)) ? '<span class="msg-saved-star">⭐</span>' : '';
-      el.innerHTML = replyHtml + content + reactionsHtml + `<div class="msg-time">${savedTag}${deletedTag}${editedTag}${formatTime(msg.timestamp)}${statusHtml}</div>`;
+      el.innerHTML = replyHtml + content + reactionsHtml + `<div class="msg-time">${savedTag}${deletedTag}${editedTag}${statusHtml}${formatTime(msg.timestamp)}</div>`;
       const waveEl = el.querySelector('.audio-wave');
       if (waveEl) initWaveTouch(waveEl);
     }
@@ -3273,7 +3273,9 @@
           const label = document.createElement('span');
           label.className = 'msg-seen-text';
           label.innerHTML = '<b class="seen-word">SEEN</b> ' + escapeHtml(formatSeenEn(otherSeenTimestamp));
-          timeRow.insertBefore(label, timeRow.firstChild);
+          const statusEl = timeRow.querySelector('.msg-status');
+          if (statusEl) timeRow.insertBefore(label, statusEl);
+          else timeRow.insertBefore(label, timeRow.firstChild);
         }
       }
     }
