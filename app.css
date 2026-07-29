@@ -168,12 +168,21 @@
     }
 
     .chat-header-status {
-      font-size: 12px; color: var(--muted); font-weight: 500;
-      opacity: 0.85; transition: opacity .2s ease;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 12px; color: #34c759; font-weight: 500;
+      height: 0; opacity: 0; overflow: hidden;
+      transition: opacity .2s ease;
     }
-    .chat-header-status:empty { display: none; }
-    .chat-header-status.online { color: #34c759; opacity: 1; }
+    .chat-header-status.online { height: auto; opacity: 1; }
+
+    .seen-label {
+      align-self: flex-end;
+      font-size: 11px;
+      color: var(--muted);
+      opacity: 0.75;
+      margin: 2px 8px 4px 8px;
+      padding: 0 4px;
+      white-space: nowrap;
+    }
 
     .btn-clear-chat {
       background: none; border: none; cursor: pointer;
