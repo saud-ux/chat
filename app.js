@@ -3308,7 +3308,7 @@
         if (timeRow) {
           const label = document.createElement('span');
           label.className = 'msg-seen-text';
-          label.textContent = 'Seen ' + formatSeenEn(otherSeenTimestamp);
+          label.innerHTML = '<b class="seen-word">SEEN</b> ' + escapeHtml(formatSeenEn(otherSeenTimestamp));
           timeRow.insertBefore(label, timeRow.firstChild);
         }
       }
