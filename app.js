@@ -3296,24 +3296,19 @@
         } else if (s.classList.contains('seen')) {
           s.classList.remove('seen'); s.innerHTML = TICK_SINGLE;
         }
+        const oldText = m.el.querySelector('.msg-seen-text');
+        if (oldText) oldText.remove();
       });
-      renderSeenLabel(lastSeenEl);
-    }
-
-    function renderSeenLabel(afterEl) {
-      let label = document.getElementById('seen-label');
-      if (!afterEl || !otherSeenTimestamp) {
-        if (label) label.remove();
-        return;
-      }
-      if (!label) {
-        label = document.createElement('div');
-        label.id = 'seen-label';
-        label.className = 'seen-label';
-      }
-      label.textContent = 'شوهدت ' + formatRelative(otherSeenTimestamp);
-      if (label.previousElementSibling !== afterEl) {
-        afterEl.insertAdjacentElement('afterend', label);
+      const oldSep = document.getElementById('seen-label');
+      if (oldSep) oldSep.remove();
+      if (lastSeenEl && otherSeenTimestamp) {
+        const timeRow = lastSeenEl.querySelector('.msg-time');
+        if (timeRow) {
+          const label = document.createElement('span');
+          label.className = 'msg-seen-text';
+          label.textContent = 'شوهدت ' + formatRelative(otherSeenTimestamp);
+          timeRow.insertBefore(label, timeRow.firstChild);
+        }
       }
     }
 
