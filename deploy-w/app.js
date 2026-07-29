@@ -483,17 +483,12 @@
     }
 
     function msgPreview(msg) {
-      if (msg.deleted) {
-        if (APP_USER !== 'saud' || !msg.content) return '🚫 رسالة محذوفة';
-      }
       if (msg.type === 'image') return '📷 صورة';
       if (msg.type === 'gif') return '🎞️ GIF';
       if (msg.type === 'video') return '🎥 فيديو';
       if (msg.type === 'audio') return '🎤 رسالة صوتية';
       if (msg.type === 'game') return msg.game === 'rps' ? '🎮 حجرة ورقة مقص' : msg.game === 'c4' ? '🎮 أربعة في خط' : msg.game === 'guess' ? '🎮 خمّن الرقم' : msg.game === 'twenty' ? '🎮 الرقم ٢٠' : '🎮 لعبة إكس أو';
-      const prefix = msg.deleted ? '🚫 ' : '';
-      const body = msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
-      return prefix + body;
+      return msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
     }
 
     /* ==========================================================
@@ -2180,15 +2175,8 @@
     ========================================================== */
     function renderMsgContent(el, msg, isMine) {
       if (msg.deleted) {
-        const canPeek = APP_USER === 'saud' && msg.content;
-        if (!canPeek) {
-          el.classList.remove('is-deleted-peek');
-          el.innerHTML = `<div class="msg-deleted">🚫 تم حذف هذه الرسالة</div><div class="msg-time">${formatTime(msg.timestamp)}</div>`;
-          return;
-        }
-        el.classList.add('is-deleted-peek');
-      } else {
-        el.classList.remove('is-deleted-peek');
+        el.innerHTML = `<div class="msg-deleted">🚫 تم حذف هذه الرسالة</div><div class="msg-time">${formatTime(msg.timestamp)}</div>`;
+        return;
       }
       let replyHtml = '';
       if (msg.replyTo) {
@@ -2229,10 +2217,9 @@
         reactionsHtml += '</div>';
       }
       const editedTag = msg.edited ? '<span class="msg-edited">(معدّلة)</span>' : '';
-      const deletedTag = msg.deleted ? '<span class="msg-deleted-tag">🚫 محذوفة</span>' : '';
-      const statusHtml = (isMine && !msg.deleted) ? `<span class="msg-status">${TICK_SINGLE}</span>` : '';
+      const statusHtml = isMine ? `<span class="msg-status">${TICK_SINGLE}</span>` : '';
       const savedTag = (el.dataset.key && isSaved(el.dataset.key)) ? '<span class="msg-saved-star">⭐</span>' : '';
-      el.innerHTML = replyHtml + content + reactionsHtml + `<div class="msg-time">${savedTag}${deletedTag}${editedTag}${statusHtml}${formatTime(msg.timestamp)}</div>`;
+      el.innerHTML = replyHtml + content + reactionsHtml + `<div class="msg-time">${savedTag}${editedTag}${statusHtml}${formatTime(msg.timestamp)}</div>`;
       const waveEl = el.querySelector('.audio-wave');
       if (waveEl) initWaveTouch(waveEl);
     }
@@ -2372,7 +2359,7 @@
       hideMsgActions();
       db.ref(`chats/${currentChatId}/messages/${key}`).update({
         deleted: true,
-        deletedAt: firebase.database.ServerValue.TIMESTAMP
+        content: ''
       });
     }
 
@@ -3664,18 +3651,6 @@
         }, 320);
       }
 
-      // Preserve keyboard when the message input is focused: preventing the
-      // pointer-down default stops the tap from stealing focus, so the user
-      // can double-tap-heart a message without the keyboard closing.
-      const keepInputFocus = (e) => {
-        const inp = document.getElementById('msg-input');
-        if (inp && document.activeElement === inp && e.cancelable) {
-          e.preventDefault();
-        }
-      };
-      el.addEventListener('touchstart', keepInputFocus, { passive: false });
-      el.addEventListener('mousedown', keepInputFocus);
-
       el.addEventListener('touchend', (e) => {
         lastTouch = Date.now();
         if (taps >= 1) e.preventDefault(); // avoid double-tap zoom on repeats
@@ -4110,7 +4085,7 @@
       }
       let found = 0;
       allMsgElements.forEach(({ el, msg }) => {
-        if (msg.deleted && (APP_USER !== 'saud' || !msg.content)) { el.classList.remove('search-highlight', 'search-dim'); return; }
+        if (msg.deleted) { el.classList.remove('search-highlight', 'search-dim'); return; }
         const text = (msg.type === 'text' ? msg.content : '').toLowerCase();
         if (text.includes(query)) {
           el.classList.add('search-highlight');
