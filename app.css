@@ -175,11 +175,12 @@
     }
 
     .chat-header-status {
-      font-size: 12px; color: #34c759; font-weight: 500;
-      height: 0; opacity: 0; overflow: hidden;
-      transition: opacity .2s ease;
+      font-size: 12px; color: var(--muted); font-weight: 500;
+      opacity: 0.85; transition: opacity .2s ease;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .chat-header-status.online { height: auto; opacity: 1; }
+    .chat-header-status:empty { display: none; }
+    .chat-header-status.online { color: #34c759; opacity: 1; }
 
     .seen-label {
       align-self: flex-end;
