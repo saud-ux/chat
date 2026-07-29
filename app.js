@@ -3454,15 +3454,18 @@
     function refreshPresenceView() {
       const fresh = otherSeenTimestamp &&
         (Date.now() + serverTimeOffset - otherSeenTimestamp) < PRESENCE_WINDOW;
-      updatePresenceIndicator(!!fresh);
+      updatePresenceIndicator(!!fresh, otherSeenTimestamp);
     }
 
-    function updatePresenceIndicator(online) {
+    function updatePresenceIndicator(online, lastSeen) {
       const dot = $('presence-dot');
       const status = $('chat-header-status');
       if (dot) dot.classList.toggle('online', !!online);
       if (status) {
-        status.textContent = online ? 'متصل الآن' : '';
+        let text = '';
+        if (online) text = 'متصل الآن';
+        else if (lastSeen) text = 'شوهدت ' + formatRelative(lastSeen);
+        status.textContent = text;
         status.classList.toggle('online', !!online);
       }
     }
