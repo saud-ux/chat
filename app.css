@@ -101,7 +101,22 @@
     .chat-preview {
       font-size: 14px; color: var(--muted); white-space: nowrap;
       overflow: hidden; text-overflow: ellipsis; flex: 1;
+      display: flex; align-items: center; gap: 4px; min-width: 0;
     }
+
+    .chat-preview-text {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1;
+    }
+
+    .chat-status {
+      flex-shrink: 0;
+      display: inline-flex; align-items: center;
+      color: var(--muted);
+      line-height: 0;
+    }
+    .chat-status:empty { display: none; }
+    .chat-status svg { width: 16px; height: 10px; }
+    .chat-status.seen { color: #34B7F1; }
 
     .unread-badge {
       background: var(--badge); color: #fff; font-size: 12px; font-weight: 700;

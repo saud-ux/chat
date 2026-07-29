@@ -87,6 +87,7 @@
     let currentAudioBtn = null;
     let activeListeners = [];
     let totalUnread = { w: 0, aseel: 0, 'w-aseel': 0 };
+    let chatCardState = {};
     let isFirstLoad = {};
     let pinnedToBottom = false;
     let audioCtx = null;
@@ -365,22 +366,49 @@
               <span class="chat-time" id="time-${chatId}"></span>
             </div>
             <div class="chat-preview-row">
-              <span class="chat-preview" id="preview-${chatId}">لا توجد رسائل</span>
+              <span class="chat-preview" id="preview-${chatId}">
+                <span class="chat-status" id="status-${chatId}"></span><span class="chat-preview-text" id="preview-text-${chatId}">لا توجد رسائل</span>
+              </span>
               <span class="unread-badge hidden" id="badge-${chatId}">0</span>
             </div>
           </div>`;
         list.appendChild(card);
+
+        const cardState = { lastMsg: null, partnerSeen: 0 };
+        chatCardState[chatId] = cardState;
+
+        const renderStatus = () => {
+          const el = $(`status-${chatId}`);
+          if (!el) return;
+          const m = cardState.lastMsg;
+          if (!m || m.sender !== homeUser) {
+            el.className = 'chat-status';
+            el.innerHTML = '';
+            return;
+          }
+          const seen = cardState.partnerSeen && m.timestamp <= cardState.partnerSeen;
+          el.className = 'chat-status' + (seen ? ' seen' : '');
+          el.innerHTML = seen ? TICK_DOUBLE : TICK_SINGLE;
+        };
 
         const msgRef = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp').limitToLast(1);
         addListener(msgRef, 'value', snap => {
           let lastMsg = null;
           snap.forEach(child => { lastMsg = child.val(); });
           if (lastMsg) {
-            const previewEl = $(`preview-${chatId}`);
+            cardState.lastMsg = lastMsg;
+            const textEl = $(`preview-text-${chatId}`);
             const timeEl = $(`time-${chatId}`);
-            if (previewEl) previewEl.textContent = msgPreview(lastMsg);
+            if (textEl) textEl.textContent = msgPreview(lastMsg);
             if (timeEl) timeEl.textContent = formatRelative(lastMsg.timestamp);
+            renderStatus();
           }
+        });
+
+        const seenRef = db.ref(`chats/${chatId}/seen/${partnerId}`);
+        addListener(seenRef, 'value', snap => {
+          cardState.partnerSeen = snap.val() || 0;
+          renderStatus();
         });
 
         updateUnreadForChat(chatId, homeUser);
