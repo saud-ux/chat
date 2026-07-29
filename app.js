@@ -367,7 +367,10 @@
           </div>
           <div class="chat-info">
             <div class="chat-name">
-              <span>${CONTACTS[partnerId].name}</span>
+              <span class="chat-name-row">
+                <span>${CONTACTS[partnerId].name}</span>
+                ${showLastActive ? `<span class="chat-last-active" id="last-active-${partnerId}"></span>` : ''}
+              </span>
               <span class="chat-time" id="time-${chatId}"></span>
             </div>
             <div class="chat-preview-row">
@@ -376,7 +379,6 @@
               </span>
               <span class="unread-badge hidden" id="badge-${chatId}">0</span>
             </div>
-            ${showLastActive ? `<div class="chat-last-active" id="last-active-${partnerId}"></div>` : ''}
           </div>`;
         list.appendChild(card);
 
