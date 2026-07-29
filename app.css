@@ -118,12 +118,21 @@
     .chat-status svg { width: 16px; height: 10px; }
     .chat-status.seen { color: #34B7F1; }
 
+    .chat-name-row {
+      display: inline-flex; align-items: center; gap: 8px; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .chat-last-active {
-      font-size: 11px; color: var(--muted); opacity: 0.75;
-      margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-size: 11px; color: var(--muted); opacity: 0.85;
+      font-weight: 500; white-space: nowrap;
+      padding: 2px 8px; border-radius: 10px;
+      background: rgba(0,0,0,0.05);
     }
     .chat-last-active:empty { display: none; }
-    .chat-last-active.is-online { color: #34c759; opacity: 1; font-weight: 600; }
+    .chat-last-active.is-online {
+      color: #fff; opacity: 1; font-weight: 600;
+      background: #34c759;
+    }
 
     .unread-badge {
       background: var(--badge); color: #fff; font-size: 12px; font-weight: 700;
