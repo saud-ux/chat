@@ -2359,7 +2359,7 @@
       hideMsgActions();
       db.ref(`chats/${currentChatId}/messages/${key}`).update({
         deleted: true,
-        content: ''
+        deletedAt: firebase.database.ServerValue.TIMESTAMP
       });
     }
 
