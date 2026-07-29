@@ -193,16 +193,16 @@
 
     .msg-seen-text {
       font-size: 10px;
-      opacity: 0.9;
+      opacity: 0.95;
       margin-left: 6px;
-      font-weight: 500;
+      font-weight: 800;
+      letter-spacing: 0.3px;
       white-space: nowrap;
     }
     .msg-seen-text .seen-word {
-      font-weight: 800;
       letter-spacing: 0.4px;
     }
-    .message-mine .msg-seen-text { color: rgba(255,255,255,0.95); }
+    .message-mine .msg-seen-text { color: rgba(255,255,255,0.98); }
 
     .btn-clear-chat {
       background: none; border: none; cursor: pointer;
