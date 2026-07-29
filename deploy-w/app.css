@@ -177,12 +177,16 @@
 
     .msg-seen-text {
       font-size: 10px;
-      opacity: 0.85;
+      opacity: 0.9;
       margin-left: 6px;
       font-weight: 500;
       white-space: nowrap;
     }
-    .message-mine .msg-seen-text { color: rgba(255,255,255,0.9); }
+    .msg-seen-text .seen-word {
+      font-weight: 800;
+      letter-spacing: 0.4px;
+    }
+    .message-mine .msg-seen-text { color: rgba(255,255,255,0.95); }
 
     .btn-clear-chat {
       background: none; border: none; cursor: pointer;
