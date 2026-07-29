@@ -88,6 +88,8 @@
     let activeListeners = [];
     let totalUnread = { w: 0, aseel: 0, 'w-aseel': 0 };
     let chatCardState = {};
+    let partnerLastActive = {};
+    let lastActiveRefreshTimer = null;
     let isFirstLoad = {};
     let pinnedToBottom = false;
     let audioCtx = null;
@@ -356,6 +358,7 @@
         card.className = 'chat-card';
         card.id = `card-${partnerId}`;
         card.onclick = (e) => navigate(chatPath(partnerId), e);
+        const showLastActive = APP_USER === 'saud';
         card.innerHTML = `
           <div class="chat-avatar" style="background:${CONTACTS[partnerId].color}">
             ${AVATARS[partnerId]}
@@ -371,6 +374,7 @@
               </span>
               <span class="unread-badge hidden" id="badge-${chatId}">0</span>
             </div>
+            ${showLastActive ? `<div class="chat-last-active" id="last-active-${partnerId}"></div>` : ''}
           </div>`;
         list.appendChild(card);
 
@@ -411,8 +415,23 @@
           renderStatus();
         });
 
+        if (showLastActive) {
+          const laRef = db.ref(`users/${partnerId}/lastActive`);
+          addListener(laRef, 'value', snap => {
+            partnerLastActive[partnerId] = snap.val() || 0;
+            renderLastActive(partnerId);
+          });
+        }
+
         updateUnreadForChat(chatId, homeUser);
       });
+
+      if (APP_USER === 'saud') {
+        clearInterval(lastActiveRefreshTimer);
+        lastActiveRefreshTimer = setInterval(() => {
+          chatPartners.forEach(pid => renderLastActive(pid));
+        }, 30000);
+      }
 
       showNotifFirstTime();
       updateNotifToggle();
@@ -478,6 +497,21 @@
           }
         });
       });
+    }
+
+    function renderLastActive(partnerId) {
+      const el = document.getElementById(`last-active-${partnerId}`);
+      if (!el) return;
+      const ts = partnerLastActive[partnerId];
+      if (!ts) { el.textContent = ''; el.classList.remove('is-online'); return; }
+      const diff = Date.now() - ts;
+      if (diff < 90000) {
+        el.textContent = '● نشط الآن';
+        el.classList.add('is-online');
+      } else {
+        el.textContent = 'آخر نشاط ' + formatRelative(ts);
+        el.classList.remove('is-online');
+      }
     }
 
     function msgPreview(msg) {
@@ -3424,6 +3458,12 @@
       if (currentView !== 'chat' && currentView !== 'person') return;
       if (document.hidden) return;
       db.ref(`chats/${currentChatId}/seen/${currentUser}`).set(firebase.database.ServerValue.TIMESTAMP);
+      markActive();
+    }
+
+    function markActive() {
+      if (!db || !APP_USER || document.hidden) return;
+      db.ref(`users/${APP_USER}/lastActive`).set(firebase.database.ServerValue.TIMESTAMP);
     }
 
     function setTyping() {
@@ -4242,6 +4282,7 @@
     document.addEventListener('visibilitychange', function() {
       if (!document.hidden) {
         markSeen();
+        markActive();
         if (currentChatId && currentUser && db) startPresence();
         resubscribePushIfNeeded();
       } else {
@@ -4249,7 +4290,8 @@
         stopPresence();
       }
     });
-    window.addEventListener('focus', markSeen);
+    window.addEventListener('focus', () => { markSeen(); markActive(); });
+    setInterval(markActive, 60000);
     window.addEventListener('pagehide', function() {
       releaseMic();
       stopPresence();
