@@ -3243,16 +3243,36 @@
     }
 
     function updateSeenIndicator() {
+      let lastSeenEl = null;
       myMessages.forEach(m => {
         const s = m.el.querySelector('.msg-status');
         if (!s) return;
         const seen = allForceSeen || (otherSeenTimestamp && m.timestamp <= otherSeenTimestamp);
         if (seen) {
           if (!s.classList.contains('seen')) { s.classList.add('seen'); s.innerHTML = TICK_DOUBLE; }
+          lastSeenEl = m.el;
         } else if (s.classList.contains('seen')) {
           s.classList.remove('seen'); s.innerHTML = TICK_SINGLE;
         }
       });
+      renderSeenLabel(lastSeenEl);
+    }
+
+    function renderSeenLabel(afterEl) {
+      let label = document.getElementById('seen-label');
+      if (!afterEl || !otherSeenTimestamp) {
+        if (label) label.remove();
+        return;
+      }
+      if (!label) {
+        label = document.createElement('div');
+        label.id = 'seen-label';
+        label.className = 'seen-label';
+      }
+      label.textContent = 'شوهدت ' + formatRelative(otherSeenTimestamp);
+      if (label.previousElementSibling !== afterEl) {
+        afterEl.insertAdjacentElement('afterend', label);
+      }
     }
 
     /* ==========================================================
@@ -3455,6 +3475,7 @@
       const fresh = otherSeenTimestamp &&
         (Date.now() + serverTimeOffset - otherSeenTimestamp) < PRESENCE_WINDOW;
       updatePresenceIndicator(!!fresh, otherSeenTimestamp);
+      updateSeenIndicator();
     }
 
     function updatePresenceIndicator(online, lastSeen) {
@@ -3462,10 +3483,7 @@
       const status = $('chat-header-status');
       if (dot) dot.classList.toggle('online', !!online);
       if (status) {
-        let text = '';
-        if (online) text = 'متصل الآن';
-        else if (lastSeen) text = 'شوهدت ' + formatRelative(lastSeen);
-        status.textContent = text;
+        status.textContent = online ? 'متصل الآن' : '';
         status.classList.toggle('online', !!online);
       }
     }
