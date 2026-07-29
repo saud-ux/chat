@@ -3548,7 +3548,7 @@
         let text = '';
         const ts = Math.max(chatPartnerLastActiveTs || 0, lastSeen || 0);
         if (online) text = 'متصل الآن';
-        else if (ts) text = 'آخر ظهور ' + formatRelative(ts);
+        else if (ts) text = 'Last seen ' + formatSeenEn(ts);
         status.textContent = text;
         status.classList.toggle('online', !!online);
       }
