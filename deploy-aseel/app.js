@@ -3424,6 +3424,12 @@
       if (currentView !== 'chat' && currentView !== 'person') return;
       if (document.hidden) return;
       db.ref(`chats/${currentChatId}/seen/${currentUser}`).set(firebase.database.ServerValue.TIMESTAMP);
+      markActive();
+    }
+
+    function markActive() {
+      if (!db || !APP_USER || document.hidden) return;
+      db.ref(`users/${APP_USER}/lastActive`).set(firebase.database.ServerValue.TIMESTAMP);
     }
 
     function setTyping() {
@@ -4242,6 +4248,7 @@
     document.addEventListener('visibilitychange', function() {
       if (!document.hidden) {
         markSeen();
+        markActive();
         if (currentChatId && currentUser && db) startPresence();
         resubscribePushIfNeeded();
       } else {
@@ -4249,7 +4256,8 @@
         stopPresence();
       }
     });
-    window.addEventListener('focus', markSeen);
+    window.addEventListener('focus', () => { markSeen(); markActive(); });
+    setInterval(markActive, 60000);
     window.addEventListener('pagehide', function() {
       releaseMic();
       stopPresence();
