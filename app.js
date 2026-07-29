@@ -3614,6 +3614,18 @@
         }, 320);
       }
 
+      // Preserve keyboard when the message input is focused: preventing the
+      // pointer-down default stops the tap from stealing focus, so the user
+      // can double-tap-heart a message without the keyboard closing.
+      const keepInputFocus = (e) => {
+        const inp = document.getElementById('msg-input');
+        if (inp && document.activeElement === inp && e.cancelable) {
+          e.preventDefault();
+        }
+      };
+      el.addEventListener('touchstart', keepInputFocus, { passive: false });
+      el.addEventListener('mousedown', keepInputFocus);
+
       el.addEventListener('touchend', (e) => {
         lastTouch = Date.now();
         if (taps >= 1) e.preventDefault(); // avoid double-tap zoom on repeats
