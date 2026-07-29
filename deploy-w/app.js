@@ -93,6 +93,7 @@
     let audioCtx = null;
     let myMessages = [];
     let otherSeenTimestamp = 0;
+    let chatPartnerLastActiveTs = 0;
     let editingKey = null;
     let typingTimer = null;
     let typingCheckInterval = null;
@@ -278,6 +279,7 @@
       currentUser = null;
       myMessages = [];
       otherSeenTimestamp = 0;
+      chatPartnerLastActiveTs = 0;
       editingKey = null;
       replyToKey = null;
       replyToMsg = null;
@@ -864,6 +866,12 @@
         otherSeenTimestamp = snap.val() || 0;
         updateSeenIndicator();
         refreshPresenceView(); // "online" is derived from a fresh seen heartbeat
+      });
+
+      const partnerLastActiveRef = db.ref(`users/${partnerId}/lastActive`);
+      addListener(partnerLastActiveRef, 'value', snap => {
+        chatPartnerLastActiveTs = snap.val() || 0;
+        refreshPresenceView();
       });
 
       // Typing indicator listener
@@ -3489,7 +3497,10 @@
       const status = $('chat-header-status');
       if (dot) dot.classList.toggle('online', !!online);
       if (status) {
-        status.textContent = online ? 'متصل الآن' : '';
+        let text = '';
+        if (online) text = 'متصل الآن';
+        else if (chatPartnerLastActiveTs) text = 'آخر ظهور ' + formatRelative(chatPartnerLastActiveTs);
+        status.textContent = text;
         status.classList.toggle('online', !!online);
       }
     }
