@@ -1188,6 +1188,13 @@
         alert('التسجيل الصوتي غير مدعوم على هذا المتصفح.');
         return;
       }
+      if (currentAudioEl) {
+        try { currentAudioEl.pause(); } catch (_) {}
+        if (currentAudioEl._cleanup) currentAudioEl._cleanup();
+        resetAudioBtn(currentAudioBtn);
+        currentAudioEl = null;
+        currentAudioBtn = null;
+      }
       clearTimeout(micReleaseTimer);
       let stream;
       try {
