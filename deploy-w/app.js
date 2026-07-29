@@ -3507,8 +3507,9 @@
       if (dot) dot.classList.toggle('online', !!online);
       if (status) {
         let text = '';
+        const ts = Math.max(chatPartnerLastActiveTs || 0, lastSeen || 0);
         if (online) text = 'متصل الآن';
-        else if (chatPartnerLastActiveTs) text = 'آخر ظهور ' + formatRelative(chatPartnerLastActiveTs);
+        else if (ts) text = 'آخر ظهور ' + formatRelative(ts);
         status.textContent = text;
         status.classList.toggle('online', !!online);
       }

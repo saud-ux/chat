@@ -417,6 +417,7 @@
         addListener(seenRef, 'value', snap => {
           cardState.partnerSeen = snap.val() || 0;
           renderStatus();
+          if (showLastActive) renderLastActive(partnerId);
         });
 
         if (showLastActive) {
@@ -506,7 +507,9 @@
     function renderLastActive(partnerId) {
       const el = document.getElementById(`last-active-${partnerId}`);
       if (!el) return;
-      const ts = partnerLastActive[partnerId];
+      const chatId = getChatId(homeUser, partnerId);
+      const fallback = (chatCardState[chatId] && chatCardState[chatId].partnerSeen) || 0;
+      const ts = Math.max(partnerLastActive[partnerId] || 0, fallback);
       if (!ts) { el.textContent = ''; el.classList.remove('is-online'); return; }
       const diff = Date.now() - ts;
       if (diff < 90000) {
@@ -3543,8 +3546,9 @@
       if (dot) dot.classList.toggle('online', !!online);
       if (status) {
         let text = '';
+        const ts = Math.max(chatPartnerLastActiveTs || 0, lastSeen || 0);
         if (online) text = 'متصل الآن';
-        else if (chatPartnerLastActiveTs) text = 'آخر ظهور ' + formatRelative(chatPartnerLastActiveTs);
+        else if (ts) text = 'آخر ظهور ' + formatRelative(ts);
         status.textContent = text;
         status.classList.toggle('online', !!online);
       }
