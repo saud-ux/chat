@@ -2590,6 +2590,72 @@
       });
     })();
 
+    (function setupPullToRefresh() {
+      document.addEventListener('DOMContentLoaded', () => {
+        const page = document.getElementById('swipe-page-chats');
+        const list = document.getElementById('chat-list');
+        if (!page || !list) return;
+
+        const ind = document.createElement('div');
+        ind.className = 'ptr-indicator';
+        ind.innerHTML = '<span class="ptr-arrow">↓</span>';
+        page.insertBefore(ind, page.firstChild);
+
+        const THRESHOLD = 70, MAX = 110;
+        let startY = 0, dist = 0, pulling = false, refreshing = false;
+
+        list.addEventListener('touchstart', (e) => {
+          if (refreshing) return;
+          if (currentHomePage !== 'chats') return;
+          if (e.touches.length !== 1) return;
+          if (list.scrollTop > 0) return;
+          startY = e.touches[0].clientY;
+          pulling = true;
+          dist = 0;
+        }, { passive: true });
+
+        list.addEventListener('touchmove', (e) => {
+          if (!pulling || refreshing) return;
+          const dy = e.touches[0].clientY - startY;
+          if (dy <= 0) {
+            dist = 0;
+            ind.style.transform = '';
+            ind.classList.remove('ready');
+            return;
+          }
+          dist = Math.min(MAX, dy * 0.5);
+          ind.style.transform = `translate(-50%, ${dist}px)`;
+          ind.classList.toggle('ready', dist >= THRESHOLD);
+          if (e.cancelable) e.preventDefault();
+        }, { passive: false });
+
+        function end() {
+          if (!pulling) return;
+          pulling = false;
+          if (dist >= THRESHOLD) {
+            refreshing = true;
+            ind.classList.add('spin', 'ready');
+            ind.style.transform = `translate(-50%, ${THRESHOLD}px)`;
+            try {
+              if (typeof cleanup === 'function') cleanup();
+              if (typeof showHome === 'function') showHome(homeUser);
+            } catch (_) {}
+            setTimeout(() => {
+              ind.classList.remove('spin', 'ready');
+              ind.style.transform = '';
+              refreshing = false;
+            }, 800);
+          } else {
+            ind.style.transform = '';
+            ind.classList.remove('ready');
+          }
+          dist = 0;
+        }
+        list.addEventListener('touchend', end, { passive: true });
+        list.addEventListener('touchcancel', end, { passive: true });
+      });
+    })();
+
     function startGameByType(gameType) {
       if (gameType === 'xo') startXO();
       else if (gameType === 'rps') startRPS();
