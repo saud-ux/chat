@@ -3272,7 +3272,7 @@
         if (timeRow) {
           const label = document.createElement('span');
           label.className = 'msg-seen-text';
-          label.textContent = 'شوهدت ' + formatRelative(otherSeenTimestamp);
+          label.textContent = 'Seen ' + formatRelative(otherSeenTimestamp);
           timeRow.insertBefore(label, timeRow.firstChild);
         }
       }
