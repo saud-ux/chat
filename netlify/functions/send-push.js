@@ -27,7 +27,7 @@ exports.handler = async function(event) {
   }
 
   try {
-    const { subscription, title, body, url } = JSON.parse(event.body);
+    const { subscription, title, body, url, type, callId, msgId } = JSON.parse(event.body);
 
     if (!subscription || !subscription.endpoint) {
       return { statusCode: 400, body: 'Missing subscription' };
@@ -36,7 +36,10 @@ exports.handler = async function(event) {
     const payload = JSON.stringify({
       title: title || 'رسالة جديدة',
       body: body || '',
-      url: url || '/'
+      url: url || '/',
+      type: type || 'message',
+      callId: callId || '',
+      msgId: msgId || ''
     });
 
     const options = {

@@ -108,6 +108,21 @@
     let requestLoadOlder = null; // fetches the previous page of older messages for the open chat
     let activeGameRef = null;
     let activeGameCb = null;
+    let callPc = null;
+    let callStream = null;
+    let callTimerInterval = null;
+    let callStartTime = 0;
+    let currentCallId = null;
+    let isInCall = false;
+    let isCaller = false;
+    let callTimeoutTimer = null;
+    let callRingtoneStop = null;
+    let alertSoundStop = null;
+    let incomingCallRef = null;
+    let callStatusRef = null;
+    let isMuted = false;
+    let callDebounce = false;
+    let alertDebounce = false;
 
     /* ==========================================================
        DOM REFERENCES
@@ -265,6 +280,7 @@
       if (currentChatId && currentUser && db) {
         db.ref(`chats/${currentChatId}/typing/${currentUser}`).remove();
       }
+      if (isInCall) cleanupCall();
       stopPresence();
       clearTimeout(typingTimer);
       clearInterval(typingCheckInterval);
@@ -488,6 +504,8 @@
       if (msg.type === 'video') return '🎥 فيديو';
       if (msg.type === 'audio') return '🎤 رسالة صوتية';
       if (msg.type === 'game') return msg.game === 'rps' ? '🎮 حجرة ورقة مقص' : msg.game === 'c4' ? '🎮 أربعة في خط' : msg.game === 'guess' ? '🎮 خمّن الرقم' : msg.game === 'twenty' ? '🎮 الرقم ٢٠' : '🎮 لعبة إكس أو';
+      if (msg.type === 'alert') return '🚨 تنبيه طارئ!';
+      if (msg.type === 'system') return msg.content;
       return msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
     }
 
@@ -521,6 +539,8 @@
           <span class="chat-header-status" id="chat-header-status"></span>
         </div>
         <div class="header-actions">
+          ${chatId !== 'w-aseel' ? `<button class="header-action-btn header-call-btn" onclick="startCall()" aria-label="اتصال"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg></button>` : ''}
+          <button class="header-action-btn header-alert-btn" onclick="sendEmergencyAlert()" aria-label="تنبيه طارئ"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
           <button class="header-action-btn" onclick="goToGamesPage()" aria-label="لعبة"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><path d="M17.32 5H6.68a4 4 0 00-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 003 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 019.828 16h4.344a2 2 0 011.414.586L17 18c.5.5 1 1 2 1a3 3 0 003-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0017.32 5z"/></svg></button>
           <button class="header-action-btn" onclick="toggleSearch()" aria-label="بحث"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
           <button class="header-action-btn" id="btn-theme" onclick="toggleTheme()" aria-label="الوضع">${isDark ? sunSvg : moonSvg}</button>
@@ -2200,6 +2220,13 @@
           : msg.game === 'guess' ? renderGuess(msg, el.dataset.key)
           : msg.game === 'twenty' ? renderTwenty(msg, el.dataset.key)
           : renderXO(msg, el.dataset.key);
+      } else if (msg.type === 'alert') {
+        content = `<div class="msg-text">${escapeHtml(msg.content)}</div>`;
+        el.classList.add('alert-msg');
+      } else if (msg.type === 'system') {
+        content = `<div class="msg-text">${escapeHtml(msg.content)}</div>`;
+        el.classList.add('system-msg');
+        if (msg.content && msg.content.indexOf('مكالمة فائتة') !== -1) el.classList.add('missed-call');
       } else {
         const ec = emojiOnlyCount(msg.content);
         bigEmoji = ec > 0;
@@ -4209,6 +4236,287 @@
     }
 
     /* ==========================================================
+       VOICE CALL (WebRTC)
+    ========================================================== */
+    const RTC_CONFIG = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    };
+
+    const PHONE_SVG = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>';
+    const ENDCALL_SVG = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.956.956 0 010-1.36C3.55 8.6 7.55 7 12 7s8.45 1.6 11.71 4.72c.18.18.29.44.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28a11.27 11.27 0 00-2.67-1.85.996.996 0 01-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>';
+    const MIC_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 003-3V6a3 3 0 00-6 0v6a3 3 0 003 3z"/><path d="M19 11a1 1 0 00-2 0 5 5 0 01-10 0 1 1 0 00-2 0 7 7 0 006 6.92V21a1 1 0 002 0v-3.08A7 7 0 0019 11z"/></svg>';
+    const MICOFF_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11a1 1 0 00-2 0c0 .9-.24 1.73-.64 2.46l1.46 1.46A6.93 6.93 0 0019 11zM12 15c.34 0 .67-.06.98-.16l-6.82-6.82A2.98 2.98 0 006 9.84V12a3 3 0 003 3h3zM4.27 3L3 4.27l6 6V12a3 3 0 004.52 2.59l1.7 1.7A6.9 6.9 0 0113 17.92V21a1 1 0 01-2 0v-3.08A7 7 0 015 11a1 1 0 00-2 0 8.96 8.96 0 003.18 6.87l-.9.9A1 1 0 005 20.5l14.73-14.73L18 4.27 14.82 7.46 12.82 5.46A3 3 0 0015 6V5.27L4.27 3z"/></svg>';
+
+    function playRingtone() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      let stopped = false; let timeouts = [];
+      function ring() {
+        if (stopped) return;
+        try {
+          const osc1 = audioCtx.createOscillator(); const g1 = audioCtx.createGain();
+          osc1.connect(g1); g1.connect(audioCtx.destination);
+          osc1.frequency.value = 440; osc1.type = 'sine'; g1.gain.value = 0.3;
+          osc1.start(); osc1.stop(audioCtx.currentTime + 0.4);
+          const osc2 = audioCtx.createOscillator(); const g2 = audioCtx.createGain();
+          osc2.connect(g2); g2.connect(audioCtx.destination);
+          osc2.frequency.value = 520; osc2.type = 'sine'; g2.gain.value = 0.3;
+          osc2.start(audioCtx.currentTime + 0.6); osc2.stop(audioCtx.currentTime + 1.0);
+        } catch(e) {}
+        timeouts.push(setTimeout(ring, 2500));
+      }
+      ring();
+      return function() { stopped = true; timeouts.forEach(clearTimeout); };
+    }
+
+    function playAlarmSound() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      let stopped = false; let osc = null; let interval = null; let high = true;
+      try {
+        osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.type = 'square'; osc.frequency.value = 800; g.gain.value = 0.25; osc.start();
+        interval = setInterval(() => { if (stopped) return; high = !high; osc.frequency.value = high ? 800 : 600; }, 200);
+      } catch(e) {}
+      return function() { stopped = true; clearInterval(interval); try { if (osc) osc.stop(); } catch(e) {} };
+    }
+
+    function sendCallPush(receiverId, callId) {
+      const senderName = APP_USER === 'saud' ? 'سعود' : (CONTACTS[APP_USER] ? CONTACTS[APP_USER].name : APP_USER);
+      const recipientUrl = receiverId === 'saud' ? `/chat/${getChatId('saud', APP_USER)}` : `/${receiverId}/chat/${APP_USER === 'saud' ? 'saud' : (APP_USER)}`;
+      db.ref(`push-subscriptions/${receiverId}`).once('value', snap => {
+        const subs = snap.val(); if (!subs) return;
+        Object.entries(subs).forEach(([subKey, sub]) => {
+          deliverPush(receiverId, subKey, { subscription: sub, title: 'مكالمة واردة', body: senderName + ' يتصل بك', url: recipientUrl, type: 'call', callId: callId }, 0);
+        });
+      });
+    }
+
+    function startCall() {
+      if (callDebounce || isInCall) return;
+      if (!currentChatId || currentChatId === 'w-aseel') return;
+      if (!navigator.onLine) { showToastMsg('لا يوجد اتصال بالإنترنت'); return; }
+      if (!window.RTCPeerConnection) { showToastMsg('متصفحك لا يدعم المكالمات'); return; }
+      callDebounce = true; setTimeout(() => { callDebounce = false; }, 2000);
+      const partnerId = getPartnerId(currentChatId, currentUser);
+      const callId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const senderName = APP_USER === 'saud' ? 'سعود' : (CONTACTS[APP_USER] ? CONTACTS[APP_USER].name : APP_USER);
+      db.ref(`calls/${callId}`).set({ callerId: APP_USER, receiverId: partnerId, callerName: senderName, status: 'ringing', timestamp: firebase.database.ServerValue.TIMESTAMP });
+      currentCallId = callId; isInCall = true; isCaller = true; isMuted = false;
+      const partnerName = CONTACTS[partnerId] ? CONTACTS[partnerId].name : partnerId;
+      const partnerColor = CONTACTS[partnerId] ? CONTACTS[partnerId].color : '#5B8FB9';
+      showCallingUI(partnerName, partnerColor, AVATARS[partnerId] || '');
+      sendCallPush(partnerId, callId);
+      callTimeoutTimer = setTimeout(() => {
+        if (currentCallId === callId && isInCall && isCaller) {
+          db.ref(`calls/${callId}/status`).set('missed');
+          db.ref(`chats/${currentChatId}/messages`).push({ sender: APP_USER, type: 'system', content: '📞 مكالمة فائتة', timestamp: firebase.database.ServerValue.TIMESTAMP });
+          cleanupCall();
+        }
+      }, 45000);
+      initCallAsCaller(callId, partnerId);
+    }
+
+    function initCallAsCaller(callId, partnerId) {
+      navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
+        callStream = stream; callPc = new RTCPeerConnection(RTC_CONFIG);
+        stream.getAudioTracks().forEach(track => callPc.addTrack(track, stream));
+        callPc.onicecandidate = e => { if (e.candidate) db.ref(`calls/${callId}/callerCandidates`).push(e.candidate.toJSON()); };
+        callPc.ontrack = e => { const audio = new Audio(); audio.srcObject = e.streams[0]; audio.play().catch(() => {}); };
+        callPc.createOffer().then(offer => callPc.setLocalDescription(offer)).then(() => {
+          db.ref(`calls/${callId}/offer`).set({ sdp: callPc.localDescription.sdp, type: callPc.localDescription.type });
+        });
+        db.ref(`calls/${callId}/answer`).on('value', snap => { const ans = snap.val(); if (ans && callPc && !callPc.currentRemoteDescription) callPc.setRemoteDescription(new RTCSessionDescription(ans)); });
+        db.ref(`calls/${callId}/receiverCandidates`).on('child_added', snap => { const c = snap.val(); if (c && callPc) callPc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}); });
+        callStatusRef = db.ref(`calls/${callId}/status`);
+        callStatusRef.on('value', snap => {
+          const st = snap.val();
+          if (st === 'answered') { clearTimeout(callTimeoutTimer); callStartTime = Date.now(); showInCallUI(); }
+          else if (st === 'rejected') { showToastMsg('رفض المكالمة'); cleanupCall(); }
+          else if (st === 'ended' && isInCall) { cleanupCall(); }
+          else if (st === 'missed') { cleanupCall(); }
+        });
+      }).catch(() => { showToastMsg('لا يمكن الوصول للميكروفون'); db.ref(`calls/${callId}/status`).set('ended'); cleanupCall(); });
+    }
+
+    function answerCall(callId) {
+      if (!callId) return; isInCall = true; isCaller = false; currentCallId = callId; isMuted = false;
+      if (callRingtoneStop) { callRingtoneStop(); callRingtoneStop = null; }
+      db.ref(`calls/${callId}/status`).set('answered');
+      db.ref(`calls/${callId}`).once('value', snap => {
+        const call = snap.val(); if (!call || !call.offer) { cleanupCall(); return; }
+        navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
+          callStream = stream; callPc = new RTCPeerConnection(RTC_CONFIG);
+          stream.getAudioTracks().forEach(track => callPc.addTrack(track, stream));
+          callPc.onicecandidate = e => { if (e.candidate) db.ref(`calls/${callId}/receiverCandidates`).push(e.candidate.toJSON()); };
+          callPc.ontrack = e => { const audio = new Audio(); audio.srcObject = e.streams[0]; audio.play().catch(() => {}); };
+          callPc.setRemoteDescription(new RTCSessionDescription(call.offer)).then(() => callPc.createAnswer()).then(answer => callPc.setLocalDescription(answer)).then(() => {
+            db.ref(`calls/${callId}/answer`).set({ sdp: callPc.localDescription.sdp, type: callPc.localDescription.type });
+          });
+          db.ref(`calls/${callId}/callerCandidates`).on('child_added', snap => { const c = snap.val(); if (c && callPc) callPc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}); });
+          callStatusRef = db.ref(`calls/${callId}/status`);
+          callStatusRef.on('value', snap => { if (snap.val() === 'ended' && isInCall) cleanupCall(); });
+          callStartTime = Date.now(); showInCallUI();
+        }).catch(() => { showToastMsg('لا يمكن الوصول للميكروفون'); db.ref(`calls/${callId}/status`).set('ended'); cleanupCall(); });
+      });
+    }
+
+    function rejectCall(callId) {
+      if (callRingtoneStop) { callRingtoneStop(); callRingtoneStop = null; }
+      db.ref(`calls/${callId}/status`).set('rejected');
+      const overlay = $('call-overlay'); if (overlay) overlay.style.display = 'none';
+    }
+
+    function endCall() { if (currentCallId) db.ref(`calls/${currentCallId}/status`).set('ended'); cleanupCall(); }
+
+    function cleanupCall() {
+      clearTimeout(callTimeoutTimer); clearInterval(callTimerInterval);
+      if (callRingtoneStop) { callRingtoneStop(); callRingtoneStop = null; }
+      if (callPc) { try { callPc.close(); } catch(e) {} callPc = null; }
+      if (callStream) { callStream.getTracks().forEach(t => t.stop()); callStream = null; }
+      if (callStatusRef) { callStatusRef.off(); callStatusRef = null; }
+      if (currentCallId) { const cid = currentCallId; setTimeout(() => { db.ref(`calls/${cid}`).remove(); }, 5000); }
+      const overlay = $('call-overlay'); if (overlay) overlay.style.display = 'none';
+      const miniBar = $('call-mini-bar'); if (miniBar) miniBar.style.display = 'none';
+      currentCallId = null; isInCall = false; isCaller = false; callStartTime = 0; isMuted = false;
+    }
+
+    function showCallingUI(name, color, avatar) {
+      const overlay = $('call-overlay'); if (!overlay) return;
+      overlay.innerHTML = `<div class="call-avatar" style="background:${color}">${avatar}</div><div class="call-name">${name}</div><div class="call-status">جاري الاتصال...</div><div class="call-actions"><button class="call-btn call-btn-end" onclick="endCall()">${ENDCALL_SVG}</button></div>`;
+      overlay.style.display = 'flex';
+    }
+
+    function showIncomingCallUI(callId, callerName, callerColor, callerAvatar) {
+      if (isInCall) { db.ref(`calls/${callId}/status`).set('rejected'); return; }
+      callRingtoneStop = playRingtone();
+      const overlay = $('call-overlay'); if (!overlay) return;
+      overlay.innerHTML = `<div class="call-avatar" style="background:${callerColor}">${callerAvatar}</div><div class="call-name">${callerName}</div><div class="call-status">مكالمة واردة...</div><div class="call-actions"><button class="call-btn call-btn-answer" onclick="answerCall('${callId}')">${PHONE_SVG}</button><button class="call-btn call-btn-end" onclick="rejectCall('${callId}')">${ENDCALL_SVG}</button></div>`;
+      overlay.style.display = 'flex';
+    }
+
+    function showInCallUI() {
+      const overlay = $('call-overlay'); if (overlay) overlay.style.display = 'none';
+      if (!currentCallId) return;
+      db.ref(`calls/${currentCallId}`).once('value', snap => {
+        const call = snap.val(); if (!call) return;
+        const partnerId = call.callerId === APP_USER ? call.receiverId : call.callerId;
+        const partnerName = CONTACTS[partnerId] ? CONTACTS[partnerId].name : partnerId;
+        const miniBar = $('call-mini-bar');
+        if (miniBar) { miniBar.innerHTML = `${PHONE_SVG} <span id="call-timer-text">00:00</span> ${partnerName}`; miniBar.style.display = 'flex'; }
+        clearInterval(callTimerInterval); callTimerInterval = setInterval(updateCallTimer, 1000); updateCallTimer();
+        overlay.innerHTML = `<div class="call-name">${partnerName}</div><div class="call-timer" id="call-timer-overlay">00:00</div><div class="call-actions"><button class="call-btn call-btn-mute${isMuted ? ' muted' : ''}" onclick="toggleMute()">${isMuted ? MICOFF_SVG : MIC_SVG}</button><button class="call-btn call-btn-end" onclick="endCall()">${ENDCALL_SVG}</button></div>`;
+        overlay.style.display = 'none';
+      });
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      if (callStream) callStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
+      const muteBtn = document.querySelector('.call-btn-mute');
+      if (muteBtn) { muteBtn.classList.toggle('muted', isMuted); muteBtn.innerHTML = isMuted ? MICOFF_SVG : MIC_SVG; }
+    }
+
+    function updateCallTimer() {
+      if (!callStartTime) return;
+      const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+      const txt = String(Math.floor(elapsed / 60)).padStart(2, '0') + ':' + String(elapsed % 60).padStart(2, '0');
+      const timerEl = document.getElementById('call-timer-text'); if (timerEl) timerEl.textContent = txt;
+      const timerOv = document.getElementById('call-timer-overlay'); if (timerOv) timerOv.textContent = txt;
+    }
+
+    function listenForIncomingCalls() {
+      if (!db || !IS_CONFIGURED) return;
+      if (incomingCallRef) { incomingCallRef.off(); }
+      incomingCallRef = db.ref('calls').orderByChild('receiverId').equalTo(APP_USER);
+      incomingCallRef.on('child_added', snap => {
+        const call = snap.val(); if (!call || call.status !== 'ringing') return;
+        if (isInCall) { db.ref(`calls/${snap.key}/status`).set('rejected'); return; }
+        const callerName = call.callerName || (CONTACTS[call.callerId] ? CONTACTS[call.callerId].name : call.callerId);
+        const callerColor = CONTACTS[call.callerId] ? CONTACTS[call.callerId].color : '#5B8FB9';
+        showIncomingCallUI(snap.key, callerName, callerColor, AVATARS[call.callerId] || '');
+      });
+    }
+
+    function showToastMsg(text) {
+      const toast = $('toast'); if (!toast) return;
+      toast.innerHTML = `<div class="toast-body"><div class="toast-text">${text}</div></div>`;
+      toast.className = 'toast'; toast.style.display = 'block';
+      requestAnimationFrame(() => toast.classList.add('visible'));
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => { toast.style.display = 'none'; }, 300); }, 3000);
+    }
+
+    /* ==========================================================
+       EMERGENCY ALERT
+    ========================================================== */
+    function sendEmergencyAlert() {
+      if (alertDebounce || !currentChatId || !currentUser || !db) return;
+      alertDebounce = true; setTimeout(() => { alertDebounce = false; }, 3000);
+      const confirmEl = document.createElement('div');
+      confirmEl.className = 'msg-actions-overlay visible';
+      confirmEl.onclick = () => confirmEl.remove();
+      confirmEl.innerHTML = `<div class="msg-actions" onclick="event.stopPropagation()" style="text-align:center;padding:24px"><div style="font-size:48px;margin-bottom:12px">🚨</div><div style="font-size:18px;font-weight:700;margin-bottom:16px">إرسال تنبيه طارئ؟</div><div style="display:flex;gap:12px;justify-content:center"><button id="alert-confirm-btn" style="background:#e74c3c;color:#fff;border:none;border-radius:12px;padding:12px 32px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">إرسال</button><button onclick="this.closest('.msg-actions-overlay').remove()" style="background:#eee;color:#333;border:none;border-radius:12px;padding:12px 32px;font-size:16px;cursor:pointer;font-family:inherit">إلغاء</button></div></div>`;
+      document.body.appendChild(confirmEl);
+      document.getElementById('alert-confirm-btn').onclick = () => { confirmEl.remove(); doSendAlert(); };
+    }
+
+    function doSendAlert() {
+      const chatId = currentChatId;
+      const senderName = APP_USER === 'saud' ? 'سعود' : (CONTACTS[APP_USER] ? CONTACTS[APP_USER].name : APP_USER);
+      const alertId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      db.ref(`alerts/${chatId}/${alertId}`).set({ sender: APP_USER, status: 'active', timestamp: firebase.database.ServerValue.TIMESTAMP });
+      db.ref(`chats/${chatId}/messages`).push({ sender: APP_USER, type: 'alert', content: '🚨 تنبيه طارئ!', timestamp: firebase.database.ServerValue.TIMESTAMP });
+      if (chatId === 'w-aseel') {
+        ['w', 'aseel'].filter(u => u !== APP_USER).forEach(rid => sendAlertPush(rid, senderName));
+      } else {
+        sendAlertPush(getPartnerId(chatId, currentUser), senderName);
+      }
+    }
+
+    function sendAlertPush(receiverId, senderName) {
+      const recipientUrl = receiverId === 'saud' ? '/' : `/${receiverId}/`;
+      db.ref(`push-subscriptions/${receiverId}`).once('value', snap => {
+        const subs = snap.val(); if (!subs) return;
+        Object.entries(subs).forEach(([subKey, sub]) => {
+          deliverPush(receiverId, subKey, { subscription: sub, title: 'تنبيه طارئ!', body: senderName + ' يحتاجك ضروري!', url: recipientUrl, type: 'alert' }, 0);
+        });
+      });
+    }
+
+    function checkActiveAlerts() {
+      if (!db || !IS_CONFIGURED) return;
+      const chatIds = APP_USER === 'saud' ? ['w', 'aseel', 'w-aseel'] : (APP_USER === 'w' ? ['w', 'w-aseel'] : ['aseel', 'w-aseel']);
+      chatIds.forEach(chatId => {
+        db.ref(`alerts/${chatId}`).orderByChild('status').equalTo('active').once('value', snap => {
+          const alerts = snap.val(); if (!alerts) return;
+          Object.entries(alerts).forEach(([alertId, alert]) => { if (alert.sender !== APP_USER) showAlertOverlay(chatId, alertId, alert.sender); });
+        });
+      });
+    }
+
+    function showAlertOverlay(chatId, alertId, senderId) {
+      const senderName = CONTACTS[senderId] ? CONTACTS[senderId].name : senderId;
+      alertSoundStop = playAlarmSound();
+      const overlay = $('alert-overlay'); if (!overlay) return;
+      overlay.innerHTML = `<div class="alert-icon">⚠️</div><div class="alert-text">${senderName} يحتاجك!</div><button class="alert-dismiss-btn" onclick="dismissAlert('${chatId}','${alertId}')">شفت</button>`;
+      overlay.style.display = 'flex';
+    }
+
+    function dismissAlert(chatId, alertId) {
+      if (alertSoundStop) { alertSoundStop(); alertSoundStop = null; }
+      db.ref(`alerts/${chatId}/${alertId}/status`).set('seen');
+      setTimeout(() => { db.ref(`alerts/${chatId}/${alertId}`).remove(); }, 5000);
+      const overlay = $('alert-overlay'); if (overlay) overlay.style.display = 'none';
+      if (currentChatId !== chatId) {
+        if (APP_USER === 'saud') { navigate('/chat/' + chatId); }
+        else { navigate((BASE_PATH || '') + '/chat/' + (chatId === 'w-aseel' ? (APP_USER === 'w' ? 'aseel' : 'w') : 'saud')); }
+      }
+    }
+
+    /* ==========================================================
        INIT
     ========================================================== */
     if ('serviceWorker' in navigator) {
@@ -4239,6 +4547,8 @@
 
     ensureMsgInputShim();
     route();
+    listenForIncomingCalls();
+    checkActiveAlerts();
     window.addEventListener('popstate', route);
 
     // Re-confirm "seen" the moment the user returns to an open chat, so the
@@ -4249,6 +4559,7 @@
         markActive();
         if (currentChatId && currentUser && db) startPresence();
         resubscribePushIfNeeded();
+        checkActiveAlerts();
       } else {
         releaseMic();
         stopPresence();
@@ -4259,4 +4570,7 @@
     window.addEventListener('pagehide', function() {
       releaseMic();
       stopPresence();
+      if (isInCall && isCaller && currentCallId) {
+        db.ref('calls/' + currentCallId + '/status').set('ended');
+      }
     });
