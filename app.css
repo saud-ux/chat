@@ -1621,6 +1621,9 @@
 
     /* ===== CALL / ALERT HEADER BUTTONS ===== */
     .header-call-btn:hover, .header-call-btn:active { color: #2ecc71; }
+    .header-endcall-btn { color: #e74c3c !important; animation: header-endcall-pulse 1.5s ease-in-out infinite; }
+    .header-endcall-btn:hover, .header-endcall-btn:active { color: #c0392b !important; }
+    @keyframes header-endcall-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     .header-alert-btn:hover, .header-alert-btn:active { color: #e74c3c; }
 
     /* ===== CALL OVERLAY ===== */

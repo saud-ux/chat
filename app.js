@@ -58,6 +58,12 @@
       saud: { name: 'سعود', color: '#6C5CE7' }
     };
 
+    const FACETIME_MAP = {
+      saud: 'saud.alhmad123@gmail.com',
+      aseel: 'asssell1983@gmail.com',
+      w: ''  // ← ضع إيميل دبليو هنا
+    };
+
     const VAPID_PUBLIC_KEY = 'BOIMSoH3ZuHz_eL09w-2cOw7FSGyTTew3q3XlJsuwe4yBvnEbi1ee3mnwz3hOvS4rA_SigRsest_GbV_KgLZPV8';
 
     const AVATARS = {
@@ -546,7 +552,7 @@
       if (msg.type === 'video') return '🎥 فيديو';
       if (msg.type === 'audio') return '🎤 رسالة صوتية';
       if (msg.type === 'game') return msg.game === 'rps' ? '🎮 حجرة ورقة مقص' : msg.game === 'c4' ? '🎮 أربعة في خط' : msg.game === 'guess' ? '🎮 خمّن الرقم' : msg.game === 'twenty' ? '🎮 الرقم ٢٠' : '🎮 لعبة إكس أو';
-      if (msg.type === 'alert') return '🚨 تنبيه طارئ!';
+      if (msg.type === 'alert') return '🚨 يبيك ضروري!';
       if (msg.type === 'system') return msg.content;
       const prefix = msg.deleted ? '🚫 ' : '';
       const body = msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
@@ -584,7 +590,7 @@
         </div>
         <div class="header-actions">
           ${chatId !== 'w-aseel' ? `<button class="header-action-btn header-call-btn" onclick="startCall()" aria-label="اتصال"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg></button>` : ''}
-          <button class="header-action-btn header-alert-btn" onclick="sendEmergencyAlert()" aria-label="تنبيه طارئ"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+          <button class="header-action-btn header-alert-btn" onclick="sendEmergencyAlert()" aria-label="يبيك ضروري"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
           <button class="header-action-btn" onclick="goToGamesPage()" aria-label="لعبة"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><path d="M17.32 5H6.68a4 4 0 00-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 003 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 019.828 16h4.344a2 2 0 011.414.586L17 18c.5.5 1 1 2 1a3 3 0 003-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0017.32 5z"/></svg></button>
           <button class="header-action-btn" onclick="toggleSearch()" aria-label="بحث"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
           <button class="header-action-btn" id="btn-theme" onclick="toggleTheme()" aria-label="الوضع">${isDark ? sunSvg : moonSvg}</button>
@@ -4391,52 +4397,35 @@
     }
 
     function startCall() {
-      if (callDebounce || isInCall) return;
       if (!currentChatId || currentChatId === 'w-aseel') return;
-      if (!navigator.onLine) { showToastMsg('لا يوجد اتصال بالإنترنت'); return; }
-      if (!window.RTCPeerConnection) { showToastMsg('متصفحك لا يدعم المكالمات'); return; }
-
-      callDebounce = true;
-      setTimeout(() => { callDebounce = false; }, 2000);
 
       const partnerId = getPartnerId(currentChatId, currentUser);
-      const callId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      const senderName = APP_USER === 'saud' ? 'سعود' : (CONTACTS[APP_USER] ? CONTACTS[APP_USER].name : APP_USER);
-
-      db.ref(`calls/${callId}`).set({
-        callerId: APP_USER,
-        receiverId: partnerId,
-        callerName: senderName,
-        status: 'ringing',
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-      });
-
-      currentCallId = callId;
-      isInCall = true;
-      isCaller = true;
-      isMuted = false;
-
+      const partnerEmail = FACETIME_MAP[partnerId];
       const partnerName = CONTACTS[partnerId] ? CONTACTS[partnerId].name : partnerId;
-      const partnerColor = CONTACTS[partnerId] ? CONTACTS[partnerId].color : '#5B8FB9';
-      const partnerAvatar = AVATARS[partnerId] || '';
-      showCallingUI(partnerName, partnerColor, partnerAvatar);
 
-      sendCallPush(partnerId, callId);
+      if (!partnerEmail) {
+        showToastMsg('الاتصال غير متاح حالياً');
+        return;
+      }
 
-      callTimeoutTimer = setTimeout(() => {
-        if (currentCallId === callId && isInCall && isCaller) {
-          db.ref(`calls/${callId}/status`).set('missed');
-          db.ref(`chats/${currentChatId}/messages`).push({
-            sender: APP_USER,
-            type: 'system',
-            content: '📞 مكالمة فائتة',
-            timestamp: firebase.database.ServerValue.TIMESTAMP
-          });
-          cleanupCall();
-        }
-      }, 45000);
-
-      initCallAsCaller(callId, partnerId);
+      // Confirmation dialog
+      const overlay = document.createElement('div');
+      overlay.className = 'confirm-overlay';
+      overlay.innerHTML = `
+        <div class="confirm-box">
+          <div style="font-size:18px;font-weight:700;margin-bottom:16px">اتصال بـ ${partnerName}؟</div>
+          <div style="font-size:13px;color:#999;margin-bottom:20px">سيتم فتح فيس تايم</div>
+          <div style="display:flex;gap:12px;justify-content:center">
+            <button class="confirm-btn confirm-cancel" id="call-cancel-btn">إلغاء</button>
+            <button class="confirm-btn confirm-ok" id="call-ok-btn">📞 اتصال</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector('#call-cancel-btn').onclick = () => overlay.remove();
+      overlay.querySelector('#call-ok-btn').onclick = () => {
+        overlay.remove();
+        window.location.href = 'facetime-audio://' + partnerEmail;
+      };
     }
 
     function initCallAsCaller(callId, partnerId) {
@@ -4745,7 +4734,7 @@
       confirmEl.onclick = () => confirmEl.remove();
       confirmEl.innerHTML = `<div class="msg-actions" onclick="event.stopPropagation()" style="text-align:center;padding:24px">
         <div style="font-size:48px;margin-bottom:12px">🚨</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:16px">إرسال تنبيه طارئ؟</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:16px">يبيك ضروري؟</div>
         <div style="display:flex;gap:12px;justify-content:center">
           <button id="alert-confirm-btn" style="background:#e74c3c;color:#fff;border:none;border-radius:12px;padding:12px 32px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">إرسال</button>
           <button onclick="this.closest('.msg-actions-overlay').remove()" style="background:#eee;color:#333;border:none;border-radius:12px;padding:12px 32px;font-size:16px;cursor:pointer;font-family:inherit">إلغاء</button>
@@ -4773,7 +4762,7 @@
       db.ref(`chats/${chatId}/messages`).push({
         sender: APP_USER,
         type: 'alert',
-        content: '🚨 تنبيه طارئ!',
+        content: '🚨 يبيك ضروري!',
         timestamp: firebase.database.ServerValue.TIMESTAMP
       });
 
@@ -4795,7 +4784,7 @@
         Object.entries(subs).forEach(([subKey, sub]) => {
           const payload = {
             subscription: sub,
-            title: 'تنبيه طارئ!',
+            title: 'يبيك ضروري!',
             body: senderName + ' يحتاجك ضروري!',
             url: recipientUrl,
             type: 'alert'
@@ -4828,7 +4817,7 @@
       if (!overlay) return;
       overlay.innerHTML = `
         <div class="alert-icon">⚠️</div>
-        <div class="alert-text">${senderName} يحتاجك!</div>
+        <div class="alert-text">${senderName} يبيك ضروري!</div>
         <button class="alert-dismiss-btn" onclick="dismissAlert('${chatId}','${alertId}')">شفت</button>`;
       overlay.style.display = 'flex';
     }

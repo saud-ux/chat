@@ -27,6 +27,7 @@
             <circle cx="29" cy="22.5" r="1.8" fill="#5B8FB9"/>
           </svg>
           <h1 class="home-title" id="home-title">رسائل</h1>
+          <button class="btn-notif-toggle" id="btn-notif-toggle" onclick="toggleNotifications()" aria-label="الإشعارات">🔔</button>
           <button class="btn-refresh" id="btn-refresh-home" onclick="forceUpdate(this)" aria-label="تحديث">🔄</button>
         </header>
         <div class="swipe-container" id="swipe-container">
@@ -65,7 +66,7 @@
         <div class="record-bar" id="record-bar" style="display:none">
           <button class="rec-cancel" id="rec-cancel" aria-label="إلغاء التسجيل">🗑️</button>
           <div class="rec-meta"><span class="rec-dot"></span><span id="rec-timer">0:00</span></div>
-          <span class="rec-hint">جاري التسجيل…</span>
+          <div class="rec-live-wave" id="rec-live-wave"><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span><span class="rec-wave-bar"></span></div>
           <button class="rec-send" id="rec-send" aria-label="إرسال التسجيل">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
@@ -107,6 +108,21 @@
     <!-- MESSAGE ACTIONS SHEET -->
     <div id="msg-actions-overlay" class="msg-actions-overlay" style="display:none" onclick="hideMsgActions()">
       <div class="msg-actions" id="msg-actions-content" onclick="event.stopPropagation()"></div>
+    </div>
+
+    <!-- CALL OVERLAY -->
+    <div id="call-overlay" class="call-overlay" style="display:none"></div>
+
+    <!-- CALL MINI BAR -->
+    <div id="call-mini-bar" class="call-mini-bar" style="display:none" onclick="showInCallUI()"></div>
+
+    <!-- ALERT OVERLAY -->
+    <div id="alert-overlay" class="alert-overlay" style="display:none"></div>
+
+    <!-- LANDSCAPE BLOCK -->
+    <div class="landscape-block">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="3"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
+      <span>يرجى تدوير الجهاز للوضع العمودي</span>
     </div>
 
   </div>
