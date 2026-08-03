@@ -60,8 +60,8 @@
 
     const FACETIME_MAP = {
       saud: 'saud.alhmad123@gmail.com',
-      aseel: 'asssell1983@gmail.com',
-      w: ''  // ← ضع إيميل دبليو هنا
+      aseel: 'saud.alhmad123@gmail.com',
+      w: 'saud.alhmad123@gmail.com'
     };
 
     const VAPID_PUBLIC_KEY = 'BOIMSoH3ZuHz_eL09w-2cOw7FSGyTTew3q3XlJsuwe4yBvnEbi1ee3mnwz3hOvS4rA_SigRsest_GbV_KgLZPV8';
