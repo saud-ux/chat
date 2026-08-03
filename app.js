@@ -60,7 +60,7 @@
 
     const FACETIME_MAP = {
       saud: 'saud.alhmad123@gmail.com',
-      aseel: 'saud.alhmad123@gmail.com',
+      aseel: 'asssell1983@gmail.com',
       w: ''  // ← ضع إيميل دبليو هنا
     };
 
@@ -4401,31 +4401,13 @@
 
       const partnerId = getPartnerId(currentChatId, currentUser);
       const partnerEmail = FACETIME_MAP[partnerId];
-      const partnerName = CONTACTS[partnerId] ? CONTACTS[partnerId].name : partnerId;
 
       if (!partnerEmail) {
         showToastMsg('الاتصال غير متاح حالياً');
         return;
       }
 
-      // Confirmation dialog
-      const overlay = document.createElement('div');
-      overlay.className = 'confirm-overlay';
-      overlay.innerHTML = `
-        <div class="confirm-box">
-          <div style="font-size:18px;font-weight:700;margin-bottom:16px">اتصال بـ ${partnerName}؟</div>
-          <div style="font-size:13px;color:#999;margin-bottom:20px">سيتم فتح فيس تايم</div>
-          <div style="display:flex;gap:12px;justify-content:center">
-            <button class="confirm-btn confirm-cancel" id="call-cancel-btn">إلغاء</button>
-            <button class="confirm-btn confirm-ok" id="call-ok-btn">📞 اتصال</button>
-          </div>
-        </div>`;
-      document.body.appendChild(overlay);
-      overlay.querySelector('#call-cancel-btn').onclick = () => overlay.remove();
-      overlay.querySelector('#call-ok-btn').onclick = () => {
-        overlay.remove();
-        window.open('facetime-audio://' + partnerEmail);
-      };
+      window.open('facetime-audio://' + partnerEmail);
     }
 
     function initCallAsCaller(callId, partnerId) {
