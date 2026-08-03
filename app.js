@@ -4407,7 +4407,7 @@
         return;
       }
 
-      window.open('facetime-audio://' + partnerEmail);
+      location.href = 'facetime-audio://' + partnerEmail;
     }
 
     function initCallAsCaller(callId, partnerId) {
