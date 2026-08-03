@@ -4424,7 +4424,13 @@
       overlay.querySelector('#call-cancel-btn').onclick = () => overlay.remove();
       overlay.querySelector('#call-ok-btn').onclick = () => {
         overlay.remove();
-        window.location.href = 'facetime-audio://' + partnerEmail;
+        const a = document.createElement('a');
+        a.href = 'facetime-audio://' + partnerEmail;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 100);
       };
     }
 
