@@ -60,7 +60,7 @@
 
     const FACETIME_MAP = {
       saud: 'saud.alhmad123@gmail.com',
-      aseel: 'asssell1983@gmail.com',
+      aseel: 'saud.alhmad123@gmail.com',
       w: ''  // ← ضع إيميل دبليو هنا
     };
 
