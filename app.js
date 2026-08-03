@@ -4407,7 +4407,14 @@
         return;
       }
 
-      location.href = 'facetime-audio://' + partnerEmail;
+      const a = document.createElement('a');
+      a.href = 'facetime-audio://' + partnerEmail;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => a.remove(), 100);
     }
 
     function initCallAsCaller(callId, partnerId) {
